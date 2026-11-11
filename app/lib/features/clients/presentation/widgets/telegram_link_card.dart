@@ -10,7 +10,7 @@ import '../clients_providers.dart';
 
 /// Estado de vinculación con Telegram y acciones para invitar al cliente.
 ///
-/// Flujo: el staff envía el enlace t.me/<bot>?start=<código> (por WhatsApp o copiándolo);
+/// Flujo: el staff envía el enlace `t.me/<bot>?start=<código>` (por WhatsApp o copiándolo);
 /// el cliente toca "Iniciar" en Telegram y queda vinculado. Desde ahí recibe los
 /// recordatorios con botones para confirmar, reprogramar o cancelar.
 class TelegramLinkCard extends ConsumerWidget {
@@ -55,11 +55,11 @@ class TelegramLinkCard extends ConsumerWidget {
 
     final link = c.telegramLinkCode == null ? null : center?.telegramLinkFor(c.telegramLinkCode!);
     if (center != null && !center.telegramConfigured) {
-      return Card(
+      return const Card(
         child: ListTile(
-          leading: const Icon(Icons.send_outlined),
-          title: const Text('Telegram no configurado'),
-          subtitle: const Text('Un administrador debe cargar el usuario del bot en Más › Datos del centro.'),
+          leading: Icon(Icons.send_outlined),
+          title: Text('Telegram no configurado'),
+          subtitle: Text('Un administrador debe cargar el usuario del bot en Más › Datos del centro.'),
         ),
       );
     }

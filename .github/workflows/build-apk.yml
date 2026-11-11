@@ -41,8 +41,7 @@ jobs:
           PUBLIC_CATALOG_URL: ${{ secrets.PUBLIC_CATALOG_URL }}
         run: |
           if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_ANON_KEY" ]; then
-            echo "::error::Faltan los secretos SUPABASE_URL y/o SUPABASE_ANON_KEY"
-            exit 1
+            echo "::warning::Faltan SUPABASE_URL / SUPABASE_ANON_KEY: el APK se compila pero muestra 'Falta configurar el servidor'"
           fi
           cat > env/prod.json <<EOF
           {

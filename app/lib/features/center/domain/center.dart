@@ -1,5 +1,3 @@
-import 'dart:typed_data';
-
 import 'package:flutter/foundation.dart';
 
 /// Datos del centro: identidad de marca, contacto y configuración de integraciones.
@@ -45,7 +43,7 @@ class BusinessCenter {
 
   bool get telegramConfigured => (telegramBotUsername ?? '').isNotEmpty;
 
-  /// Enlace de vinculación para un cliente: t.me/<bot>?start=<código>
+  /// Enlace de vinculación para un cliente: `t.me/<bot>?start=<código>`
   String? telegramLinkFor(String code) =>
       telegramConfigured ? 'https://t.me/${telegramBotUsername!.replaceAll('@', '')}?start=$code' : null;
 

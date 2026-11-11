@@ -94,8 +94,8 @@ class ReportQuery {
   final ReportGroup group;
 
   @override
-  bool operator ==(Object o) =>
-      o is ReportQuery && o.type == type && o.from == from && o.to == to && o.group == group;
+  bool operator ==(Object other) =>
+      other is ReportQuery && other.type == type && other.from == from && other.to == to && other.group == group;
 
   @override
   int get hashCode => Object.hash(type, from, to, group);
