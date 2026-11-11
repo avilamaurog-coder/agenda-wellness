@@ -1,0 +1,69 @@
+name: Panel web de administración
+
+# Publica admin-web/ en GitHub Pages con la configuración de Supabase.
+# Requisitos (una sola vez):
+#   * Settings › Pages › Source: "GitHub Actions"
+#   * Secretos SUPABASE_URL y SUPABASE_ANON_KEY (los mismos que usa el APK)
+# Nota: en cuentas gratuitas, GitHub Pages solo funciona con repositorios públicos.
+# Si el repositorio es privado, el job "empaquetar" igual deja el panel listo para
+# descargar (Artifacts) y subirlo a Netlify o Cloudflare Pages.
+
+on:
+  push:
+    branches: [main]
+    paths: ["admin-web/**", ".github/workflows/admin-web.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: admin-web
+  cancel-in-progress: true
+
+jobs:
+  empaquetar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generar config.js desde los secretos
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_ANON_KEY" ]; then
+            echo "::warning::Sin secretos SUPABASE_URL/SUPABASE_ANON_KEY: el panel se publica en modo demo"
+          fi
+          cat > admin-web/config.js <<EOF
+          window.AW_CONFIG = {
+            supabaseUrl: "${SUPABASE_URL}",
+            supabaseAnonKey: "${SUPABASE_ANON_KEY}",
+          };
+          EOF
+
+      - name: Verificar sintaxis
+        run: node --check admin-web/app.js && node --check admin-web/api.js
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: panel-web
+          path: admin-web
+          retention-days: 30
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: admin-web
+
+  publicar:
+    needs: empaquetar
+    runs-on: ubuntu-latest
+    continue-on-error: true   # si Pages no está habilitado, el paquete igual queda en Artifacts
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v4

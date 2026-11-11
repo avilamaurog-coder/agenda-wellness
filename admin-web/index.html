@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Panel Agenda Wellness</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='18' fill='%235E7D6F'/%3E%3Cpath d='M32 14c6 8 9 15 9 21a9 9 0 0 1-18 0c0-6 3-13 9-21z' fill='%23fff'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=Fraunces:opsz,wght@9..144,600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <script src="config.js"></script>
+</head>
+<body>
+  <!-- ============================================================ Login -->
+  <section id="login-view" class="login" hidden>
+    <form id="login-form" class="login-card" autocomplete="on">
+      <div class="brand-mark" id="login-logo" aria-hidden="true"></div>
+      <h1 class="display" id="login-title">Agenda Wellness</h1>
+      <p class="muted">Panel de administración</p>
+      <label>Email<input type="email" name="email" required autocomplete="username"></label>
+      <label>Contraseña<input type="password" name="password" required autocomplete="current-password"></label>
+      <p class="form-error" id="login-error" role="alert"></p>
+      <button class="btn primary block" type="submit">Ingresar</button>
+      <button class="btn link" type="button" id="forgot-btn">¿Olvidaste tu contraseña?</button>
+      <div id="demo-box" class="demo-box" hidden>
+        <p>No hay un proyecto Supabase configurado.</p>
+        <button class="btn block" type="button" id="demo-btn">Ver demo con datos de ejemplo</button>
+      </div>
+    </form>
+  </section>
+
+  <!-- ============================================================ App -->
+  <div id="app-view" class="app" hidden>
+    <aside class="sidebar">
+      <div class="sidebar-brand">
+        <div class="brand-mark small" id="side-logo" aria-hidden="true"></div>
+        <div>
+          <strong id="center-name">Agenda Wellness</strong>
+          <span class="muted tiny">Panel de administración</span>
+        </div>
+      </div>
+      <nav class="nav" aria-label="Secciones">
+        <a href="#agenda" data-view="agenda"><svg viewBox="0 0 24 24"><path d="M7 2v3M17 2v3M3 9h18M5 5h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z"/></svg>Agenda</a>
+        <a href="#usuarios" data-view="usuarios"><svg viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8"/></svg>Usuarios<span class="badge" id="pending-badge" hidden></span></a>
+        <a href="#clientes" data-view="clientes"><svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z"/></svg>Clientes</a>
+        <a href="#resumen" data-view="resumen"><svg viewBox="0 0 24 24"><path d="M3 3v18h18M7 15l4-4 3 3 5-6"/></svg>Resumen</a>
+      </nav>
+      <div class="sidebar-foot">
+        <div class="me">
+          <span class="avatar" id="me-avatar"></span>
+          <div><strong id="me-name"></strong><span class="muted tiny" id="me-email"></span></div>
+        </div>
+        <div class="row gap-s">
+          <button class="btn ghost small" id="theme-btn" type="button" title="Cambiar tema (automático / claro / oscuro)">Tema</button>
+          <button class="btn ghost small" id="logout-btn" type="button">Salir</button>
+        </div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <div class="demo-banner" id="demo-banner" hidden>Modo demo: los cambios no se guardan.</div>
+
+      <!-- ------------------------------------------------ Agenda -->
+      <section class="view" id="view-agenda" hidden>
+        <header class="view-head">
+          <div>
+            <h1 class="display" id="agenda-title">Agenda</h1>
+            <p class="muted" id="agenda-sub"></p>
+          </div>
+          <div class="toolbar">
+            <div class="seg" role="group" aria-label="Vista">
+              <button type="button" data-agenda-view="day" class="on">Día</button>
+              <button type="button" data-agenda-view="week">Semana</button>
+            </div>
+            <div class="row gap-s">
+              <button class="btn icon" type="button" id="prev-btn" aria-label="Anterior">‹</button>
+              <button class="btn" type="button" id="today-btn">Hoy</button>
+              <button class="btn icon" type="button" id="next-btn" aria-label="Siguiente">›</button>
+              <input type="date" id="date-input" aria-label="Fecha">
+            </div>
+            <select id="therapist-filter" aria-label="Profesional"></select>
+            <button class="btn primary" type="button" id="new-appt-btn">+ Nuevo turno</button>
+          </div>
+        </header>
+        <div class="legend" id="legend"></div>
+        <div class="grid-wrap" id="grid-wrap">
+          <div class="grid" id="grid"></div>
+        </div>
+        <p class="muted tiny hint">Arrastrá un turno para reprogramarlo · Hacé clic en un hueco libre para crear uno.</p>
+      </section>
+
+      <!-- ------------------------------------------------ Usuarios -->
+      <section class="view" id="view-usuarios" hidden>
+        <header class="view-head">
+          <div>
+            <h1 class="display">Usuarios</h1>
+            <p class="muted">Aprobá accesos, asigná roles y cargá los horarios de cada profesional.</p>
+          </div>
+          <div class="toolbar">
+            <input type="search" id="user-search" placeholder="Buscar por nombre o email" aria-label="Buscar usuarios">
+            <button class="btn primary" type="button" id="invite-btn">+ Invitar usuario</button>
+          </div>
+        </header>
+        <div id="pending-users"></div>
+        <div class="card">
+          <table class="table" id="users-table">
+            <thead><tr><th>Usuario</th><th>Rol</th><th>Estado</th><th>Horario</th><th class="right">Acciones</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ------------------------------------------------ Clientes -->
+      <section class="view" id="view-clientes" hidden>
+        <header class="view-head">
+          <div>
+            <h1 class="display">Clientes</h1>
+            <p class="muted" id="clients-count"></p>
+          </div>
+          <div class="toolbar">
+            <input type="search" id="client-search" placeholder="Nombre, DNI, teléfono o email" aria-label="Buscar clientes">
+            <button class="btn primary" type="button" id="new-client-btn">+ Nuevo cliente</button>
+          </div>
+        </header>
+        <div class="card">
+          <table class="table" id="clients-table">
+            <thead><tr><th>Cliente</th><th>DNI</th><th>Contacto</th><th>Alertas</th><th class="right"></th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ------------------------------------------------ Resumen -->
+      <section class="view" id="view-resumen" hidden>
+        <header class="view-head">
+          <div>
+            <h1 class="display">Resumen del mes</h1>
+            <p class="muted" id="summary-period"></p>
+          </div>
+        </header>
+        <div class="kpis" id="kpis"></div>
+        <div class="two-col">
+          <div class="card pad"><h2>Servicios más vendidos</h2><div id="top-services"></div></div>
+          <div class="card pad"><h2>Horarios con más demanda</h2><div id="peak-hours"></div></div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Contenedores de diálogos y avisos -->
+  <dialog id="modal" class="modal"></dialog>
+  <aside id="drawer" class="drawer" hidden aria-live="polite"></aside>
+  <div id="toast" class="toast" role="status" hidden></div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
