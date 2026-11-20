@@ -32,6 +32,8 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
+          # Fijado: Flutter 3.50.x rompe el lint de image_picker_android al compilar en release
+          flutter-version: 3.47.9
           cache: true
 
       - name: Configuración de la app
