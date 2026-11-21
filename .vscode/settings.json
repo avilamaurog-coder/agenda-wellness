@@ -1,0 +1,16 @@
+{
+  // Las Edge Functions de Supabase son Deno/TypeScript; el resto del repo no.
+  "deno.enablePaths": ["supabase/functions", "supabase/scripts"],
+  "dart.flutterHotReloadOnSave": "all",
+  "[dart]": {
+    "editor.formatOnSave": false,
+    "editor.rulers": [100]
+  },
+  "files.exclude": {
+    "**/.dart_tool": true
+  },
+  "search.exclude": {
+    "**/build": true,
+    "**/.dart_tool": true
+  }
+}

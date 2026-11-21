@@ -30,6 +30,7 @@ Registrate en la app: el **primer usuario** queda como Administrador. Para deep 
 
 - **Sin instalar nada:** subí el proyecto a un repo privado de GitHub, cargá los secretos `SUPABASE_URL` y `SUPABASE_ANON_KEY`, y ejecutá *Actions › Compilar APK Android*.
 - **En tu PC (Windows):** `cd app` → completar `env\prod.json` → `.\tool\build_android.ps1`.
+- **En Visual Studio Code:** abrir la carpeta del repo → tarea *1. Preparar proyecto* → completar `app/env/prod.json` → **Ctrl+Shift+B**. Ver [docs/10-vscode.md](docs/10-vscode.md).
 
 Detalle en [docs/08-compilar-android.md](docs/08-compilar-android.md).
 
@@ -46,6 +47,7 @@ Detalle en [docs/08-compilar-android.md](docs/08-compilar-android.md).
 | 7 | [Telegram, web, backups, logo y vitrina](docs/07-telegram-web-backups-vitrina.md) | Bot y confirmaciones, web solo admin, Google Drive/OneDrive, restauración, catálogo público |
 | 8 | [Compilar e instalar en Android](docs/08-compilar-android.md) | APK en GitHub Actions o en tu PC, instalación en el celular, problemas frecuentes |
 | 9 | [Panel web de administración](docs/09-panel-web.md) | Usuarios y agenda desde la computadora, modo demo, publicación en GitHub Pages |
+| 10 | [Visual Studio Code](docs/10-vscode.md) | Abrir, ejecutar (F5) y compilar APK/web desde VS Code |
 
 ## Qué incluye el código
 

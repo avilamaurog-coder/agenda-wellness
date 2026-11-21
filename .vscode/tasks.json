@@ -1,0 +1,71 @@
+{
+  // Terminal › Ejecutar tarea…  (Ctrl+Shift+B compila el APK directamente)
+  "version": "2.0.0",
+  "options": { "cwd": "${workspaceFolder}/app" },
+  "tasks": [
+    {
+      "label": "1. Preparar proyecto (primera vez)",
+      "type": "shell",
+      "command": "dart run tool/setup.dart",
+      "problemMatcher": []
+    },
+    {
+      "label": "2. Compilar APK Android (release)",
+      "type": "shell",
+      "command": "flutter build apk --release --dart-define-from-file=env/prod.json",
+      "group": { "kind": "build", "isDefault": true },
+      "problemMatcher": []
+    },
+    {
+      "label": "3. Instalar APK en el celular (USB)",
+      "type": "shell",
+      "command": "flutter install --release",
+      "problemMatcher": []
+    },
+    {
+      "label": "4. Compilar web",
+      "type": "shell",
+      "command": "flutter build web --release --dart-define-from-file=env/prod.json",
+      "group": "build",
+      "problemMatcher": []
+    },
+    {
+      "label": "5. Compilar App Bundle (Play Store)",
+      "type": "shell",
+      "command": "flutter build appbundle --release --dart-define-from-file=env/prod.json",
+      "group": "build",
+      "problemMatcher": []
+    },
+    {
+      "label": "Analizar código",
+      "type": "shell",
+      "command": "flutter analyze --no-fatal-infos",
+      "problemMatcher": []
+    },
+    {
+      "label": "Tests",
+      "type": "shell",
+      "command": "flutter test",
+      "group": { "kind": "test", "isDefault": true },
+      "problemMatcher": []
+    },
+    {
+      "label": "Descargar dependencias (pub get)",
+      "type": "shell",
+      "command": "flutter pub get",
+      "problemMatcher": []
+    },
+    {
+      "label": "Limpiar compilación",
+      "type": "shell",
+      "command": "flutter clean",
+      "problemMatcher": []
+    },
+    {
+      "label": "Verificar instalación (flutter doctor)",
+      "type": "shell",
+      "command": "flutter doctor -v",
+      "problemMatcher": []
+    }
+  ]
+}

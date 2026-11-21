@@ -1,0 +1,39 @@
+{
+  // F5 para ejecutar. Elegí el dispositivo (celular, emulador, Chrome, Windows)
+  // en la barra de estado inferior de VS Code.
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "App (desarrollo)",
+      "type": "dart",
+      "request": "launch",
+      "cwd": "app",
+      "program": "lib/main.dart",
+      "toolArgs": ["--dart-define-from-file=env/dev.json"]
+    },
+    {
+      "name": "App (producción, depuración)",
+      "type": "dart",
+      "request": "launch",
+      "cwd": "app",
+      "program": "lib/main.dart",
+      "toolArgs": ["--dart-define-from-file=env/prod.json"]
+    },
+    {
+      "name": "App (producción, release)",
+      "type": "dart",
+      "request": "launch",
+      "cwd": "app",
+      "program": "lib/main.dart",
+      "flutterMode": "release",
+      "toolArgs": ["--dart-define-from-file=env/prod.json"]
+    },
+    {
+      "name": "Tests unitarios",
+      "type": "dart",
+      "request": "launch",
+      "cwd": "app",
+      "program": "test/"
+    }
+  ]
+}
