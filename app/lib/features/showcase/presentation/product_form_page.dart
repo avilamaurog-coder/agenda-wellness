@@ -30,7 +30,9 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
   late final _stock = TextEditingController(text: widget.product?.stock?.toString());
   late bool _active = widget.product?.isActive ?? true;
   late bool _featured = widget.product?.isFeatured ?? false;
+  late bool _giftCard = widget.product?.isGiftCard ?? false;
   Uint8List? _image;
+  Uint8List? _template;
   bool _saving = false;
 
   bool get _editing => widget.product?.id != null;
@@ -68,8 +70,11 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
               isActive: _active,
               isFeatured: _featured,
               sortOrder: widget.product?.sortOrder ?? 0,
+              isGiftCard: _giftCard,
+              giftTemplateUrl: widget.product?.giftTemplateUrl,
             ),
             image: _image,
+            templateImage: _template,
           );
       ref.invalidate(productsProvider);
       if (mounted) {
@@ -159,6 +164,64 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
                 Expanded(child: TextFormField(controller: _brand, decoration: const InputDecoration(labelText: 'Marca'))),
               ],
             ),
+            const SectionTitle('Tarjeta de regalo'),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              value: _giftCard,
+              title: const Text('Es tarjeta de regalo'),
+              subtitle: const Text('Permite emitir tarjetas con nombre y fechas de validez'),
+              onChanged: (v) => setState(() => _giftCard = v),
+            ),
+            if (_giftCard) ...[
+              const SizedBox(height: 8),
+              GestureDetector(
+                onTap: () async {
+                  final f = await ImagePicker().pickImage(source: ImageSource.gallery, maxWidth: 1800, imageQuality: 90);
+                  if (f != null) {
+                    final bytes = await f.readAsBytes();
+                    setState(() => _template = bytes);
+                  }
+                },
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: AspectRatio(
+                    aspectRatio: 3 / 2,
+                    child: _template != null
+                        ? Image.memory(_template!, fit: BoxFit.cover)
+                        : widget.product?.giftTemplateUrl != null
+                            ? CachedNetworkImage(imageUrl: widget.product!.giftTemplateUrl!, fit: BoxFit.cover)
+                            : ColoredBox(
+                                color: t.colorScheme.surfaceContainerHighest,
+                                child: const Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(Icons.image_outlined, size: 36),
+                                    Text('Plantilla de la tarjeta (sin nombre ni fechas)'),
+                                  ],
+                                ),
+                              ),
+                  ),
+                ),
+              ),
+              if (_editing) ...[
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    FilledButton.icon(
+                      icon: const Icon(Icons.card_giftcard_rounded),
+                      label: const Text('Emitir tarjeta'),
+                      onPressed: () => context.push('/servicios/tarjetas/emitir', extra: widget.product),
+                    ),
+                    OutlinedButton(
+                      onPressed: () => context.push('/servicios/tarjetas'),
+                      child: const Text('Tarjetas emitidas'),
+                    ),
+                  ],
+                ),
+              ],
+            ],
             const SectionTitle('Precio y stock'),
             Row(
               children: [

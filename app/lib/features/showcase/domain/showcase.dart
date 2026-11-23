@@ -15,6 +15,8 @@ class Product {
     this.isActive = true,
     this.isFeatured = false,
     this.sortOrder = 0,
+    this.isGiftCard = false,
+    this.giftTemplateUrl,
   });
 
   final String? id;
@@ -29,6 +31,8 @@ class Product {
   final bool isActive;
   final bool isFeatured;
   final int sortOrder;
+  final bool isGiftCard;
+  final String? giftTemplateUrl; // plantilla de la tarjeta (sin nombre ni fechas)
 
   num get effectivePrice => promoPrice ?? price;
   bool get inStock => stock == null || stock! > 0;
@@ -46,6 +50,8 @@ class Product {
         isActive: j['is_active'] as bool? ?? true,
         isFeatured: j['is_featured'] as bool? ?? false,
         sortOrder: (j['sort_order'] as num?)?.toInt() ?? 0,
+        isGiftCard: j['is_gift_card'] as bool? ?? false,
+        giftTemplateUrl: j['gift_template_url'] as String?,
       );
 
   Map<String, dynamic> toRow() => {
@@ -60,6 +66,8 @@ class Product {
         'is_active': isActive,
         'is_featured': isFeatured,
         'sort_order': sortOrder,
+        'is_gift_card': isGiftCard,
+        'gift_template_url': giftTemplateUrl,
       };
 }
 
@@ -139,10 +147,67 @@ class PromoPost {
       };
 }
 
+/// Tarjeta de regalo emitida a un destinatario (el diseño vive en el producto).
+@immutable
+class GiftCard {
+  const GiftCard({
+    this.id,
+    this.productId,
+    this.productName,
+    this.templateUrl,
+    this.code = '',
+    required this.recipientName,
+    required this.amount,
+    required this.validFrom,
+    required this.validUntil,
+    this.status = 'activa',
+  });
+
+  final String? id;
+  final String? productId;
+  final String? productName;
+  final String? templateUrl;
+  final String code; // lo asigna la base de datos
+  final String recipientName;
+  final num amount; // monto al momento de emitir
+  final DateTime validFrom;
+  final DateTime validUntil;
+  final String status; // activa | canjeada | vencida | anulada
+
+  factory GiftCard.fromJson(Map<String, dynamic> j) {
+    final product = j['product'] as Map<String, dynamic>?;
+    return GiftCard(
+      id: j['id'] as String?,
+      productId: j['product_id'] as String?,
+      productName: product?['name'] as String?,
+      templateUrl: product?['gift_template_url'] as String?,
+      code: j['code'] as String? ?? '',
+      recipientName: j['recipient_name'] as String,
+      amount: j['amount'] as num,
+      validFrom: DateTime.parse(j['valid_from'] as String),
+      validUntil: DateTime.parse(j['valid_until'] as String),
+      status: j['status'] as String? ?? 'activa',
+    );
+  }
+
+  Map<String, dynamic> toRow() => {
+        'product_id': productId,
+        'recipient_name': recipientName.trim(),
+        'amount': amount,
+        'valid_from': validFrom.toIso8601String().substring(0, 10),
+        'valid_until': validUntil.toIso8601String().substring(0, 10),
+        'status': status,
+      };
+}
+
 abstract interface class ShowcaseRepository {
   Future<List<Product>> products();
-  Future<Product> saveProduct(Product p, {Uint8List? image});
+  Future<Product> saveProduct(Product p, {Uint8List? image, Uint8List? templateImage});
   Future<void> deleteProduct(String id);
+
+  Future<List<GiftCard>> giftCards();
+  Future<GiftCard> saveGiftCard(GiftCard g);
+  Future<void> setGiftCardStatus(String id, String status);
 
   Future<List<PromoPost>> posts();
   Future<PromoPost> savePost(PromoPost p, {Uint8List? image});

@@ -18,6 +18,8 @@ import '../../features/dashboard/presentation/dashboard_page.dart';
 import '../../features/showcase/domain/showcase.dart';
 import '../../features/showcase/presentation/catalog_page.dart';
 import '../../features/showcase/presentation/post_form_page.dart';
+import '../../features/showcase/presentation/gift/gift_card_form_page.dart';
+import '../../features/showcase/presentation/gift/gift_cards_page.dart';
 import '../../features/showcase/presentation/product_form_page.dart';
 import '../../features/showcase/presentation/public_catalog_page.dart';
 import '../../features/settings/presentation/notifications_page.dart';
@@ -142,6 +144,17 @@ final routerProvider = Provider<GoRouter>((ref) {
                   parentNavigatorKey: _rootKey,
                   redirect: (_, s) => s.extra is Product ? null : '/servicios',
                   builder: (_, s) => ProductFormPage(product: s.extra as Product?),
+                ),
+                GoRoute(
+                  path: 'tarjetas',
+                  parentNavigatorKey: _rootKey,
+                  builder: (_, __) => const GiftCardsPage(),
+                ),
+                GoRoute(
+                  path: 'tarjetas/emitir',
+                  parentNavigatorKey: _rootKey,
+                  redirect: (_, s) => s.extra is Product ? null : '/servicios',
+                  builder: (_, s) => GiftCardFormPage(product: s.extra as Product),
                 ),
                 GoRoute(
                   path: 'promociones/nueva',
