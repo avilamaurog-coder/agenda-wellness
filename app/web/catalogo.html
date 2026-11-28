@@ -474,13 +474,14 @@ function textoPedido(){
   var c = calcular(), tipo = tipoSel(), nombre = $("fNombre").value.trim(), nota = $("fNota").value.trim();
   var L = [];
   L.push("¡Hola " + (cat.center.name || "") + "! Soy " + nombre + ".");
-  L.push(tipo === "presupuesto" ? "Quisiera un *presupuesto* por:" : "Quiero hacer este *pedido*:");
+  // Presupuesto: va sin precios (los pasa el centro). Pedido: con precios y total estimado.
+  var conPrecios = tipo !== "presupuesto";
+  L.push(conPrecios ? "Quiero hacer este *pedido*:" : "Quisiera un *presupuesto* por:");
   L.push("");
   c.filas.forEach(function(r){
-    L.push("• " + r.n + " × " + r.x.nombre + (r.x.precio.final ? " — " + pesos(r.x.precio.final) + " c/u = " + pesos(r.sub) : " — precio a consultar"));
+    L.push("• " + r.n + " × " + r.x.nombre + (!conPrecios ? "" : r.x.precio.final ? " — " + pesos(r.x.precio.final) + " c/u = " + pesos(r.sub) : " — precio a consultar"));
   });
-  L.push("");
-  L.push("*Total estimado: " + pesos(c.total) + "*" + (c.consultar ? " (+ ítems a consultar)" : ""));
+  if (conPrecios) { L.push(""); L.push("*Total estimado: " + pesos(c.total) + "*" + (c.consultar ? " (+ ítems a consultar)" : "")); }
   if (nota) { L.push(""); L.push("Comentarios: " + nota); }
   L.push(""); L.push("(Armado desde el catálogo · " + hoy() + ")");
   return L.join("\n");
@@ -521,24 +522,29 @@ $("btnEnviar").addEventListener("click", function(){
 });
 $("btnImprimir").addEventListener("click", function(){
   if (!validar()) return;
-  var c = calcular(), h = $("hoja"); h.innerHTML = "";
+  var c = calcular(), h = $("hoja"), conPrecios = tipoSel() !== "presupuesto"; h.innerHTML = "";
   h.appendChild(el("h1", null, cat.center.name || ""));
-  h.appendChild(el("div", null, (tipoSel() === "presupuesto" ? "Presupuesto" : "Pedido") + " · " + hoy() + " · " + $("fNombre").value.trim()));
+  h.appendChild(el("div", null, (conPrecios ? "Pedido" : "Pedido de presupuesto") + " · " + hoy() + " · " + $("fNombre").value.trim()));
   var tb = el("table"), th = el("tr");
-  [["Cant.",""],["Detalle",""],["Precio unit.","r"],["Subtotal","r"]].forEach(function(x){ th.appendChild(el("th", x[1], x[0])); });
+  var cols = conPrecios ? [["Cant.",""],["Detalle",""],["Precio unit.","r"],["Subtotal","r"]] : [["Cant.",""],["Detalle",""]];
+  cols.forEach(function(x){ th.appendChild(el("th", x[1], x[0])); });
   tb.appendChild(th);
   c.filas.forEach(function(r){
     var tr = el("tr");
     tr.appendChild(el("td", null, String(r.n))); tr.appendChild(el("td", null, r.x.nombre));
-    tr.appendChild(el("td", "r", r.x.precio.final ? pesos(r.x.precio.final) : "A consultar"));
-    tr.appendChild(el("td", "r", r.x.precio.final ? pesos(r.sub) : "—"));
+    if (conPrecios) {
+      tr.appendChild(el("td", "r", r.x.precio.final ? pesos(r.x.precio.final) : "A consultar"));
+      tr.appendChild(el("td", "r", r.x.precio.final ? pesos(r.sub) : "—"));
+    }
     tb.appendChild(tr);
   });
-  var tt = el("tr", "tot"); tt.appendChild(el("td")); tt.appendChild(el("td", null, "Total estimado")); tt.appendChild(el("td"));
-  tt.appendChild(el("td", "r", pesos(c.total))); tb.appendChild(tt);
+  if (conPrecios) {
+    var tt = el("tr", "tot"); tt.appendChild(el("td")); tt.appendChild(el("td", null, "Total estimado")); tt.appendChild(el("td"));
+    tt.appendChild(el("td", "r", pesos(c.total))); tb.appendChild(tt);
+  }
   h.appendChild(tb);
   if ($("fNota").value.trim()) h.appendChild(el("p", null, "Comentarios: " + $("fNota").value.trim()));
-  h.appendChild(el("p", null, "Precios de referencia, sujetos a confirmación del centro."));
+  h.appendChild(el("p", null, conPrecios ? "Precios de referencia, sujetos a confirmación del centro." : "El centro te va a responder con los precios."));
   window.print();
 });
 $("btnVaciar").addEventListener("click", function(){
