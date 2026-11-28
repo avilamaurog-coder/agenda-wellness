@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#141416">
+<title>Carga masiva de productos · Agenda Wellness</title>
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<!--
+  GRUPO CAPYBARA · Agenda Wellness · Carga masiva de productos (28/11/2026)
+  Se publica junto con la app: agenda.grupocapybara.online/productos-masivo.html
+  - Usa la misma sesión que la app (misma dirección web).
+  - Paso 1: se sube una planilla Excel/CSV con Código · Nombre · Precio · Stock. Se muestra una vista previa
+    (nuevo / se actualiza / con error) y al confirmar se guarda todo junto.
+    Un código que ya existe actualiza ese producto; si no tiene código pero coincide el nombre exacto con un
+    producto sin código, se le asigna el código. Los productos que no están en la planilla no se tocan.
+  - Paso 2: imágenes. Una por una desde el listado, o varias juntas nombrando cada archivo con el código
+    del producto (ej. A001.jpg). Se guardan donde las guarda la app (showcase/<centro>/products/).
+  - Requiere la migración 11_productos_codigo.sql (columna products.code).
+-->
+<style>
+  :root{--bg:#141416;--card:#1C1E22;--line:rgba(255,255,255,.09);--txt:#EAE2D2;--head:#F3EFE7;--muted:#A1A9B1;--gold:#D4A64A;--gold2:#E0B865;--ok:#7BC59A;--err:#E8907E;--info:#8FB8DE}
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--txt);font:15px/1.5 Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  a{color:var(--gold2)}
+  [hidden]{display:none!important}
+  header{display:flex;align-items:center;gap:12px;padding:14px 20px;border-bottom:1px solid var(--line);position:sticky;top:0;background:rgba(20,20,22,.96);z-index:5}
+  header h1{font-size:18px;margin:0;color:var(--head);font-weight:700}
+  header .sp{flex:1}
+  header .centro{color:var(--muted);font-size:13px}
+  .wrap{max-width:1100px;margin:0 auto;padding:22px 18px 60px}
+  .box{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:20px;margin-bottom:22px}
+  .box h2{font-size:17px;margin:0 0 6px;color:var(--head)}
+  .box p.sub{margin:0 0 14px;color:var(--muted);font-size:14px}
+  label{display:block;font-size:13px;font-weight:600;color:var(--muted);margin:12px 0 5px}
+  input,select{background:#141416;color:var(--head);border:1px solid rgba(255,255,255,.14);border-radius:10px;padding:9px 12px;font:inherit;font-size:14.5px}
+  input:focus,select:focus{outline:none;border-color:var(--gold)}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:0;border-radius:11px;padding:10px 16px;font:600 14.5px Inter,system-ui,sans-serif;cursor:pointer;background:var(--gold);color:#141416;text-decoration:none}
+  .btn:hover{background:var(--gold2)}
+  .btn.sec{background:transparent;color:var(--head);border:1px solid rgba(255,255,255,.18)}
+  .btn.sec:hover{border-color:var(--gold)}
+  .btn.sm{padding:6px 10px;font-size:13px;border-radius:9px}
+  .btn[disabled]{opacity:.5;cursor:not-allowed}
+  .acciones{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:14px}
+  .soltar{border:2px dashed rgba(212,166,74,.45);border-radius:14px;padding:26px;text-align:center;color:var(--muted);cursor:pointer}
+  .soltar.encima{background:rgba(212,166,74,.08);border-color:var(--gold)}
+  .soltar b{color:var(--head)}
+  .msg{font-size:14px;margin-top:12px;min-height:1.2em;white-space:pre-line}
+  .msg.ok{color:var(--ok)}.msg.err{color:var(--err)}
+  .resumen{display:flex;gap:10px;flex-wrap:wrap;margin:14px 0 4px}
+  .chip{border-radius:999px;padding:4px 12px;font-size:13px;font-weight:700}
+  .chip.nuevo{background:rgba(123,197,154,.15);color:var(--ok)}
+  .chip.act{background:rgba(143,184,222,.15);color:var(--info)}
+  .chip.err{background:rgba(232,144,126,.13);color:var(--err)}
+  .chip.igual{background:rgba(255,255,255,.07);color:var(--muted)}
+  .tablewrap{overflow-x:auto;max-height:480px;overflow-y:auto;border:1px solid var(--line);border-radius:12px;margin-top:10px}
+  table{width:100%;border-collapse:collapse;font-size:14px}
+  th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:middle}
+  th{color:var(--muted);font-weight:600;font-size:12.5px;position:sticky;top:0;background:var(--card);z-index:1}
+  td.r,th.r{text-align:right}
+  td.cod{font-family:ui-monospace,Consolas,monospace;color:var(--gold2)}
+  td .antes{color:var(--muted);text-decoration:line-through;font-size:12.5px;margin-right:6px}
+  tr.err td{background:rgba(232,144,126,.06)}
+  .thumb{width:46px;height:46px;border-radius:8px;object-fit:cover;background:#111;display:block}
+  .sinfoto{width:46px;height:46px;border-radius:8px;border:1px dashed rgba(255,255,255,.2);display:grid;place-items:center;color:var(--muted);font-size:18px}
+  .filtros{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  .filtros input[type=search]{flex:1;min-width:200px}
+  .chk{display:inline-flex;align-items:center;gap:6px;color:var(--muted);font-size:14px;margin:0}
+  .chk input{width:auto}
+  .vacio{color:var(--muted);text-align:center;padding:20px}
+  .vistas{display:inline-flex;border:1px solid rgba(255,255,255,.16);border-radius:10px;overflow:hidden}
+  .vista{border:0;background:transparent;color:var(--muted);padding:8px 12px;cursor:pointer;font:600 13.5px Inter,system-ui,sans-serif;white-space:nowrap}
+  .vista[aria-pressed="true"]{background:var(--gold);color:#141416}
+  .grilla{display:grid;grid-template-columns:repeat(auto-fill,minmax(145px,1fr));gap:10px;margin-top:10px;max-height:720px;overflow-y:auto;padding:2px}
+  .ficha{background:#141416;border:1px solid var(--line);border-radius:12px;overflow:hidden;display:flex;flex-direction:column}
+  .ficha .foto{width:100%;aspect-ratio:1/1;object-fit:cover;background:#111;display:block}
+  .ficha .foto.vacia{display:grid;place-items:center;color:var(--muted);font-size:40px;border-bottom:1px dashed rgba(255,255,255,.15)}
+  .ficha .in{padding:10px 12px;display:flex;flex-direction:column;gap:3px;flex:1}
+  .ficha .cod{font-family:ui-monospace,Consolas,monospace;color:var(--gold2);font-size:12.5px}
+  .ficha .nom{color:var(--head);font-weight:600;font-size:14px;line-height:1.3}
+  .ficha .dat{color:var(--muted);font-size:13px;display:flex;justify-content:space-between;gap:8px}
+  .ficha .acc{display:flex;gap:6px;margin-top:auto;padding-top:8px}
+  .ficha .acc .btn{flex:1}
+  #login{max-width:420px;margin:60px auto}
+  #login input{width:100%}
+  ol.pasos{margin:6px 0 0;padding-left:20px;color:var(--muted);font-size:14px}
+  ol.pasos b{color:var(--head)}
+</style>
+</head>
+<body>
+<header>
+  <a class="btn sec sm" href="/">← Volver a la agenda</a>
+  <h1>📦 Carga masiva de productos</h1>
+  <span class="sp"></span>
+  <span class="centro" id="nombreCentro"></span>
+</header>
+
+<div id="login" class="box" hidden>
+  <h2>Entrá con tu cuenta de la agenda</h2>
+  <form id="formLogin">
+    <label for="lgEmail">Correo</label>
+    <input id="lgEmail" type="email" autocomplete="username" required>
+    <label for="lgPass">Contraseña</label>
+    <input id="lgPass" type="password" autocomplete="current-password" required>
+    <div class="acciones"><button class="btn" type="submit">Entrar</button></div>
+    <div class="msg" id="lgMsg"></div>
+  </form>
+</div>
+
+<div class="wrap" id="app" hidden>
+  <!-- Paso 1: planilla -->
+  <div class="box">
+    <h2>1 · Subir la planilla</h2>
+    <p class="sub">Excel (.xlsx o .xls) o CSV con cuatro columnas: <b>Código · Nombre del producto · Precio · Stock</b>. La primera fila puede tener los títulos.</p>
+    <ol class="pasos">
+      <li>Si el <b>código ya existe</b>, se actualizan nombre, precio y stock de ese producto.</li>
+      <li>Si el código es <b>nuevo</b>, se crea el producto (activo y visible en el catálogo).</li>
+      <li>Los productos que <b>no están</b> en la planilla quedan como están.</li>
+    </ol>
+    <div class="acciones">
+      <button class="btn sec" type="button" id="btnModelo">⬇ Descargar planilla modelo</button>
+      <button class="btn sec" type="button" id="btnExportar">⬇ Exportar mis productos</button>
+    </div>
+    <div class="soltar" id="soltar" style="margin-top:16px" tabindex="0" role="button" aria-label="Elegir planilla">
+      <b>Arrastrá la planilla acá</b> o tocá para elegirla
+      <input id="fPlanilla" type="file" accept=".xlsx,.xls,.csv,.ods" hidden>
+    </div>
+    <div class="msg" id="msgPlanilla"></div>
+
+    <div id="vista" hidden>
+      <div class="resumen" id="resumen"></div>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>Fila</th><th>Código</th><th>Nombre</th><th class="r">Precio</th><th class="r">Stock</th><th>Qué pasa</th></tr></thead>
+          <tbody id="filasVista"></tbody>
+        </table>
+      </div>
+      <div class="acciones">
+        <button class="btn" type="button" id="btnImportar">Guardar productos</button>
+        <button class="btn sec" type="button" id="btnCancelar">Cancelar</button>
+      </div>
+      <div class="msg" id="msgImportar"></div>
+    </div>
+  </div>
+
+  <!-- Paso 2: imágenes -->
+  <div class="box">
+    <h2>2 · Imágenes</h2>
+    <p class="sub">Cuando quieras: una por una con <b>Subir</b>, o varias juntas nombrando cada archivo con el código del producto (ej. <b>A001.jpg</b>).</p>
+    <div class="acciones" style="margin-top:0">
+      <label class="btn sec" style="margin:0" for="fVarias">🖼 Subir varias imágenes por código</label>
+      <input id="fVarias" type="file" accept="image/*" multiple hidden>
+    </div>
+    <div class="msg" id="msgImagenes"></div>
+
+    <div class="filtros" style="margin-top:14px">
+      <input type="search" id="buscar" placeholder="Buscar por código o nombre…">
+      <label class="chk"><input type="checkbox" id="soloSinFoto"> Solo sin imagen</label>
+      <div class="vistas" role="group" aria-label="Cómo ver los productos">
+        <button type="button" class="vista" data-vista="lista" aria-pressed="true" title="Lista">☰ Lista</button>
+        <button type="button" class="vista" data-vista="grande" aria-pressed="false" title="Iconos grandes">▦ Iconos</button>
+      </div>
+    </div>
+    <div class="grilla" id="grilla" hidden></div>
+    <div class="tablewrap" id="tablaLista">
+      <table>
+        <thead><tr><th>Imagen</th><th>Código</th><th>Nombre</th><th class="r">Precio</th><th class="r">Stock</th><th></th></tr></thead>
+        <tbody id="lista"><tr><td colspan="6" class="vacio">Cargando…</td></tr></tbody>
+      </table>
+    </div>
+    <input id="fUna" type="file" accept="image/*" hidden>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<script>
+(function(){
+"use strict";
+var SB_URL = "https://qmjrndimibjoxrigvmgt.supabase.co";
+var SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFtanJuZGltaWJqb3hyaWd2bWd0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTUyODY1MTQsImV4cCI6MjExMDg2MjUxNH0.HNS36EbHA7FO84XTXsr6JN9CElkwoep8CbBd8wDm84c";
+var CLAVE_SESION = "sb-qmjrndimibjoxrigvmgt-auth-token";
+var BUCKET = "showcase";
+
+function $(id){ return document.getElementById(id); }
+function el(tag, cls, txt){ var e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; }
+function msg(id, tipo, t){ $(id).className = "msg " + (tipo||""); $(id).textContent = t || ""; }
+function pesos(n){ return n == null || n === "" ? "—" : "$ " + Number(n).toLocaleString("es-AR", {maximumFractionDigits:2}); }
+function normal(s){ return String(s == null ? "" : s).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/\s+/g," ").trim(); }
+
+/* La app Flutter guarda la sesión sin "expires_at": se calcula desde el token (igual que tarjeta-regalo.html). */
+(function prepararSesion(){
+  try {
+    var crudo = localStorage.getItem(CLAVE_SESION); if (!crudo) return;
+    var s = JSON.parse(crudo); if (typeof s === "string") s = JSON.parse(s);
+    if (s && s.currentSession) s = s.currentSession;
+    if (!s || !s.access_token) return;
+    if (!s.expires_at) { var pl = JSON.parse(atob(s.access_token.split(".")[1].replace(/-/g,"+").replace(/_/g,"/"))); s.expires_at = pl.exp; }
+    localStorage.setItem(CLAVE_SESION, JSON.stringify(s));
+  } catch (e) {}
+})();
+var sb = supabase.createClient(SB_URL, SB_KEY, { auth: { storageKey: CLAVE_SESION, persistSession: true, autoRefreshToken: true, detectSessionInUrl: false } });
+
+var estado = { centro: null, productos: [], vista: [], subiendoId: null };
+
+/* ---------- ingreso ---------- */
+async function arrancar(){
+  var r = await sb.auth.getSession(), ses = r.data && r.data.session;
+  if (!ses) { $("login").hidden = false; return; }
+  try { await cargarCentro(ses.user); }
+  catch (e) { console.error(e); $("login").hidden = false; $("app").hidden = true; msg("lgMsg", "err", e.message || "No pudimos abrir tu centro. Entrá de nuevo."); }
+}
+$("formLogin").addEventListener("submit", async function(ev){
+  ev.preventDefault(); msg("lgMsg", "", "Entrando…");
+  var r = await sb.auth.signInWithPassword({ email: $("lgEmail").value.trim(), password: $("lgPass").value });
+  if (r.error) return msg("lgMsg", "err", "Correo o contraseña incorrectos.");
+  $("lgPass").value = "";
+  try { await cargarCentro(r.data.user); $("login").hidden = true; }
+  catch (e) { console.error(e); msg("lgMsg", "err", e.message || "No pudimos abrir tu centro."); }
+});
+async function cargarCentro(user){
+  var cid = null;
+  var p = await sb.from("profiles").select("center_id").eq("id", user.id).maybeSingle();
+  if (p.data && p.data.center_id) cid = p.data.center_id;
+  if (!cid) { var rc = await sb.rpc("current_center_id"); if (!rc.error) cid = rc.data; }
+  if (!cid) throw new Error("Tu cuenta todavía no tiene un centro activo en la agenda.");
+  var c = await sb.from("centers").select("id,name").eq("id", cid).maybeSingle();
+  if (c.error || !c.data) throw new Error("No pudimos leer los datos de tu centro.");
+  estado.centro = c.data; $("nombreCentro").textContent = c.data.name || "";
+  $("app").hidden = false;
+  await cargarProductos();
+}
+async function cargarProductos(){
+  var r = await sb.from("products").select("id,code,name,price,stock,image_url,is_active").order("sort_order").order("name").limit(5000);
+  if (r.error) {
+    console.error(r.error);
+    $("lista").innerHTML = '<tr><td colspan="6" class="vacio">No pudimos cargar los productos.</td></tr>';
+    if (/code/.test(r.error.message)) msg("msgPlanilla", "err", "Falta aplicar la migración 11 (código de producto) en la base.");
+    return;
+  }
+  estado.productos = r.data || [];
+  pintarLista();
+}
+
+/* ---------- planilla: lectura ---------- */
+var COLUMNAS = {
+  code:  ["codigo","cod","cod.","sku","codigo de producto","codigo producto","id","referencia","ref"],
+  name:  ["nombre","nombre producto","nombre del producto","producto","descripcion","articulo","detalle"],
+  price: ["precio","precio de venta","precio venta","precio unitario","importe","valor","pvp"],
+  stock: ["stock","cantidad","existencia","unidades","cant","cant."]
+};
+function numero(v){
+  if (v == null || v === "") return null;
+  if (typeof v === "number") return v;
+  var s = String(v).replace(/[^\d,.\-]/g, "");
+  if (!s) return NaN;
+  // Formato argentino: 12.500,50 → 12500.50. Si solo hay punto con 3 dígitos detrás, es separador de miles.
+  if (s.indexOf(",") >= 0) s = s.replace(/\./g, "").replace(",", ".");
+  else if (/^\-?\d{1,3}(\.\d{3})+$/.test(s)) s = s.replace(/\./g, "");
+  return Number(s);
+}
+function texto(v){ return v == null ? "" : String(v).replace(/\s+/g, " ").trim(); }
+function codigo(v){ var t = texto(v); return /^\d+\.0+$/.test(t) ? t.replace(/\.0+$/, "") : t; }
+
+function leerPlanilla(file){
+  msg("msgPlanilla", "", "Leyendo " + file.name + "…");
+  var lector = new FileReader();
+  lector.onload = function(){
+    try {
+      var wb = XLSX.read(lector.result, { type: "array" });
+      var hoja = wb.Sheets[wb.SheetNames[0]];
+      var filas = XLSX.utils.sheet_to_json(hoja, { header: 1, raw: true, defval: "" });
+      procesar(filas);
+    } catch (e) { console.error(e); msg("msgPlanilla", "err", "No pudimos leer ese archivo. Guardalo como Excel (.xlsx) o CSV y probá de nuevo."); }
+  };
+  lector.readAsArrayBuffer(file);
+}
+
+function procesar(filas){
+  filas = filas.filter(function(f){ return f.some(function(c){ return texto(c) !== ""; }); });
+  if (!filas.length) return msg("msgPlanilla", "err", "La planilla está vacía.");
+  // ¿La primera fila son títulos? Se busca cada columna por su nombre; si no, se usa el orden A-B-C-D.
+  var pos = { code: 0, name: 1, price: 2, stock: 3 }, primera = filas[0].map(normal), encontrados = 0, ini = 0;
+  var conTitulos = {};
+  Object.keys(COLUMNAS).forEach(function(k){
+    var i = primera.findIndex(function(t){ return COLUMNAS[k].indexOf(t) >= 0; });
+    if (i < 0) i = primera.findIndex(function(t){ return t && COLUMNAS[k].some(function(n){ return n.length > 3 && t.indexOf(n) === 0; }); });
+    if (i >= 0) { conTitulos[k] = i; encontrados++; }
+  });
+  if (encontrados >= 2) {
+    ini = 1;
+    Object.keys(pos).forEach(function(k){ if (conTitulos[k] != null) pos[k] = conTitulos[k]; else pos[k] = -1; });
+    if (pos.name < 0) return msg("msgPlanilla", "err", "No encontramos la columna del nombre del producto. Usá los títulos: Código, Nombre, Precio, Stock.");
+  } else if (primera.every(function(t){ return isNaN(numero(t)) || t === ""; }) && isNaN(numero(filas[0][2]))) {
+    ini = 1; // primera fila con títulos que no reconocemos: se saltea y se usa el orden de columnas
+  }
+
+  // Índices de lo que ya existe
+  var porCodigo = {}, porNombreSinCodigo = {};
+  estado.productos.forEach(function(p){
+    if (p.code) porCodigo[normal(p.code)] = p;
+    else if (!porNombreSinCodigo[normal(p.name)]) porNombreSinCodigo[normal(p.name)] = p;
+  });
+
+  var vistos = {}, vista = [];
+  for (var i = ini; i < filas.length; i++) {
+    var f = filas[i];
+    var r = { fila: i + 1, code: pos.code >= 0 ? codigo(f[pos.code]) : "", name: texto(f[pos.name]),
+              price: pos.price >= 0 ? numero(f[pos.price]) : null, stock: pos.stock >= 0 ? numero(f[pos.stock]) : null, errores: [] };
+    if (!r.name) r.errores.push("falta el nombre");
+    if (r.name.length > 150) r.errores.push("nombre muy largo");
+    if (!r.code) r.errores.push("falta el código");
+    if (r.price == null) r.errores.push("falta el precio");
+    else if (isNaN(r.price) || r.price < 0) r.errores.push("precio inválido");
+    if (r.stock != null && (isNaN(r.stock) || r.stock < 0)) r.errores.push("stock inválido");
+    else if (r.stock != null) r.stock = Math.round(r.stock);
+    var k = normal(r.code);
+    if (r.code && vistos[k]) r.errores.push("código repetido (fila " + vistos[k] + ")");
+    if (r.code && !vistos[k]) vistos[k] = r.fila;
+
+    if (!r.errores.length) {
+      var ex = porCodigo[k], porNombre = false;
+      if (!ex && porNombreSinCodigo[normal(r.name)]) { ex = porNombreSinCodigo[normal(r.name)]; porNombre = true; delete porNombreSinCodigo[normal(r.name)]; }
+      r.existente = ex || null;
+      if (!ex) r.accion = "nuevo";
+      else if (!porNombre && ex.name === r.name && Number(ex.price) === r.price && (r.stock == null || ex.stock === r.stock)) r.accion = "igual";
+      else r.accion = porNombre ? "asignar" : "actualiza";
+    } else r.accion = "error";
+    vista.push(r);
+  }
+  if (!vista.length) return msg("msgPlanilla", "err", "No encontramos filas con productos debajo de los títulos.");
+  estado.vista = vista;
+  pintarVista();
+  msg("msgPlanilla", "ok", "Leímos " + vista.length + " filas. Revisá la vista previa y tocá «Guardar productos».");
+}
+
+function pintarVista(){
+  var c = { nuevo:0, actualiza:0, asignar:0, igual:0, error:0 };
+  estado.vista.forEach(function(r){ c[r.accion]++; });
+  var res = $("resumen"); res.innerHTML = "";
+  if (c.nuevo) res.appendChild(el("span", "chip nuevo", c.nuevo + " nuevos"));
+  if (c.actualiza + c.asignar) res.appendChild(el("span", "chip act", (c.actualiza + c.asignar) + " se actualizan"));
+  if (c.igual) res.appendChild(el("span", "chip igual", c.igual + " sin cambios"));
+  if (c.error) res.appendChild(el("span", "chip err", c.error + " con errores (no se guardan)"));
+
+  var tb = $("filasVista"); tb.innerHTML = "";
+  // Primero los errores, para que se vean.
+  estado.vista.slice().sort(function(a, b){ return (a.accion === "error" ? 0 : 1) - (b.accion === "error" ? 0 : 1) || a.fila - b.fila; }).forEach(function(r){
+    var tr = el("tr", r.accion === "error" ? "err" : "");
+    tr.appendChild(el("td", null, String(r.fila)));
+    tr.appendChild(el("td", "cod", r.code || "—"));
+    var tn = el("td"); if (r.existente && r.existente.name !== r.name) tn.appendChild(el("span", "antes", r.existente.name)); tn.appendChild(document.createTextNode(r.name || "—")); tr.appendChild(tn);
+    var tp = el("td", "r"); if (r.existente && Number(r.existente.price) !== r.price) tp.appendChild(el("span", "antes", pesos(r.existente.price))); tp.appendChild(document.createTextNode(isNaN(r.price) ? "?" : pesos(r.price))); tr.appendChild(tp);
+    var ts = el("td", "r"); if (r.existente && r.stock != null && r.existente.stock !== r.stock) ts.appendChild(el("span", "antes", r.existente.stock == null ? "—" : String(r.existente.stock))); ts.appendChild(document.createTextNode(r.stock == null ? "—" : isNaN(r.stock) ? "?" : String(r.stock))); tr.appendChild(ts);
+    var q = { nuevo:["chip nuevo","Nuevo"], actualiza:["chip act","Se actualiza"], asignar:["chip act","Se le asigna el código"], igual:["chip igual","Sin cambios"], error:["chip err", r.errores.join(", ")] }[r.accion];
+    var tq = el("td"); tq.appendChild(el("span", q[0], q[1])); tr.appendChild(tq);
+    tb.appendChild(tr);
+  });
+  var guardables = c.nuevo + c.actualiza + c.asignar;
+  $("btnImportar").disabled = !guardables;
+  $("btnImportar").textContent = guardables ? "Guardar " + guardables + " producto" + (guardables === 1 ? "" : "s") : "No hay cambios para guardar";
+  $("vista").hidden = false;
+  msg("msgImportar");
+}
+
+/* ---------- planilla: guardar ---------- */
+$("btnImportar").addEventListener("click", async function(){
+  var filas = estado.vista.filter(function(r){ return r.accion === "nuevo" || r.accion === "actualiza" || r.accion === "asignar"; });
+  if (!filas.length) return;
+  var btn = this; btn.disabled = true; $("btnCancelar").disabled = true;
+  var nuevos = 0, actualizados = 0, fallas = [];
+  // Todas las filas llevan id (el existente o uno nuevo) para guardarlas juntas en tandas de 200.
+  var datos = filas.map(function(r){
+    var d = { id: r.existente ? r.existente.id : crypto.randomUUID(), code: r.code, name: r.name, price: r.price };
+    if (r.stock != null) d.stock = r.stock;
+    return d;
+  });
+  // Las filas sin stock no se pueden mezclar con las que sí tienen en la misma tanda (mismas columnas).
+  var grupos = [datos.filter(function(d){ return "stock" in d; }), datos.filter(function(d){ return !("stock" in d); })];
+  for (var g = 0; g < grupos.length; g++) {
+    for (var i = 0; i < grupos[g].length; i += 200) {
+      var tanda = grupos[g].slice(i, i + 200);
+      msg("msgImportar", "", "Guardando… " + (nuevos + actualizados + fallas.length) + " de " + datos.length);
+      var r = await sb.from("products").upsert(tanda, { onConflict: "id" });
+      if (r.error) {
+        console.error(r.error);
+        var detalle = /products_centro_codigo|duplicate/.test(r.error.message) ? "hay un código que ya usa otro producto" : r.error.message;
+        tanda.forEach(function(d){ fallas.push(d.code + " (" + detalle + ")"); });
+      } else tanda.forEach(function(d){ if (filas.some(function(f){ return f.existente && f.existente.id === d.id; })) actualizados++; else nuevos++; });
+    }
+  }
+  $("btnCancelar").disabled = false;
+  await cargarProductos();
+  estado.vista = []; $("vista").hidden = true; $("fPlanilla").value = "";
+  var t = "Listo: " + nuevos + " productos nuevos y " + actualizados + " actualizados.";
+  if (fallas.length) t += "\nNo se pudieron guardar " + fallas.length + ": " + fallas.slice(0, 10).join("; ") + (fallas.length > 10 ? "…" : "");
+  t += "\nAhora podés sumarles imágenes en el paso 2.";
+  msg("msgPlanilla", fallas.length ? "err" : "ok", t);
+  btn.disabled = false;
+});
+$("btnCancelar").addEventListener("click", function(){ estado.vista = []; $("vista").hidden = true; $("fPlanilla").value = ""; msg("msgPlanilla"); });
+
+/* Elegir / arrastrar planilla */
+var zona = $("soltar");
+zona.addEventListener("click", function(){ $("fPlanilla").click(); });
+zona.addEventListener("keydown", function(ev){ if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); $("fPlanilla").click(); } });
+zona.addEventListener("dragover", function(ev){ ev.preventDefault(); zona.classList.add("encima"); });
+zona.addEventListener("dragleave", function(){ zona.classList.remove("encima"); });
+zona.addEventListener("drop", function(ev){ ev.preventDefault(); zona.classList.remove("encima"); var f = ev.dataTransfer.files[0]; if (f) leerPlanilla(f); });
+$("fPlanilla").addEventListener("change", function(){ if (this.files[0]) leerPlanilla(this.files[0]); });
+
+/* Planilla modelo y exportación */
+$("btnModelo").addEventListener("click", function(){
+  var ws = XLSX.utils.aoa_to_sheet([["Código","Nombre del producto","Precio","Stock"],["A001","Crema hidratante facial 50 ml",18500,12],["A002","Sérum vitamina C 30 ml",24900,5],["B010","Protector solar FPS 50",21000,20]]);
+  ws["!cols"] = [{wch:12},{wch:40},{wch:12},{wch:8}];
+  var wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Productos");
+  XLSX.writeFile(wb, "planilla-productos.xlsx");
+});
+$("btnExportar").addEventListener("click", function(){
+  var filas = [["Código","Nombre del producto","Precio","Stock"]].concat(estado.productos.map(function(p){ return [p.code || "", p.name, Number(p.price) || 0, p.stock == null ? "" : p.stock]; }));
+  var ws = XLSX.utils.aoa_to_sheet(filas); ws["!cols"] = [{wch:12},{wch:40},{wch:12},{wch:8}];
+  var wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Productos");
+  XLSX.writeFile(wb, "mis-productos.xlsx");
+});
+
+/* ---------- imágenes ---------- */
+/* Botones Subir/Cambiar y Quitar de un producto (los usan las dos vistas). */
+function botonesImagen(p, cont){
+  var b = el("button", "btn sec sm", p.image_url ? "Cambiar" : "Subir"); b.type = "button";
+  b.addEventListener("click", function(){ estado.subiendoId = p.id; $("fUna").value = ""; $("fUna").click(); });
+  cont.appendChild(b);
+  if (p.image_url) {
+    var bq = el("button", "btn sec sm", "Quitar"); bq.type = "button";
+    bq.addEventListener("click", async function(){
+      if (!confirm("¿Quitar la imagen de " + p.name + "?")) return;
+      var r = await sb.from("products").update({ image_url: null }).eq("id", p.id);
+      if (r.error) return msg("msgImagenes", "err", "No pudimos quitar la imagen.");
+      p.image_url = null; pintarLista();
+    });
+    cont.appendChild(bq);
+  }
+}
+
+function pintarLista(){
+  var grande = estado.vista === "grande", tb = $("lista"), gr = $("grilla");
+  var q = normal($("buscar").value), sin = $("soloSinFoto").checked;
+  $("tablaLista").hidden = grande; gr.hidden = !grande;
+  tb.innerHTML = ""; gr.innerHTML = "";
+  var lista = estado.productos.filter(function(p){ return (!sin || !p.image_url) && (!q || normal((p.code||"") + " " + p.name).indexOf(q) >= 0); });
+  var vacio = estado.productos.length ? "No hay productos con ese filtro." : "Todavía no hay productos. Subí la planilla en el paso 1.";
+  var aviso = lista.length > 500 ? "Se muestran 500 de " + lista.length + ". Usá el buscador para encontrar el resto." : "";
+
+  if (grande) {
+    if (!lista.length) { gr.appendChild(el("div", "vacio", vacio)); gr.style.display = "block"; return; }
+    gr.style.display = "";
+    lista.slice(0, 500).forEach(function(p){
+      var f = el("div", "ficha");
+      if (p.image_url) { var im = el("img", "foto"); im.src = p.image_url; im.alt = ""; im.loading = "lazy"; f.appendChild(im); }
+      else f.appendChild(el("div", "foto vacia", "📷"));
+      var inn = el("div", "in");
+      inn.appendChild(el("div", "cod", p.code || "sin código"));
+      inn.appendChild(el("div", "nom", p.name + (p.is_active ? "" : " (inactivo)")));
+      var dat = el("div", "dat"); dat.appendChild(el("span", null, pesos(p.price))); dat.appendChild(el("span", null, "Stock: " + (p.stock == null ? "—" : p.stock)));
+      inn.appendChild(dat);
+      var acc = el("div", "acc"); botonesImagen(p, acc); inn.appendChild(acc);
+      f.appendChild(inn); gr.appendChild(f);
+    });
+    if (aviso) { var a = el("div", "vacio", aviso); a.style.gridColumn = "1 / -1"; gr.appendChild(a); }
+    return;
+  }
+
+  if (!lista.length) { tb.innerHTML = '<tr><td colspan="6" class="vacio">' + vacio + "</td></tr>"; return; }
+  lista.slice(0, 500).forEach(function(p){
+    var tr = el("tr"), ti = el("td");
+    if (p.image_url) { var im = el("img", "thumb"); im.src = p.image_url; im.alt = ""; im.loading = "lazy"; ti.appendChild(im); }
+    else ti.appendChild(el("div", "sinfoto", "📷"));
+    tr.appendChild(ti);
+    tr.appendChild(el("td", "cod", p.code || "—"));
+    tr.appendChild(el("td", null, p.name + (p.is_active ? "" : " (inactivo)")));
+    tr.appendChild(el("td", "r", pesos(p.price)));
+    tr.appendChild(el("td", "r", p.stock == null ? "—" : String(p.stock)));
+    var ta = el("td"); ta.style.whiteSpace = "nowrap";
+    var cont = el("div"); cont.style.cssText = "display:flex;gap:6px"; botonesImagen(p, cont); ta.appendChild(cont);
+    tr.appendChild(ta); tb.appendChild(tr);
+  });
+  if (aviso) { var tr = el("tr"); var td = el("td", "vacio", aviso); td.colSpan = 6; tr.appendChild(td); tb.appendChild(tr); }
+}
+$("buscar").addEventListener("input", pintarLista);
+$("soloSinFoto").addEventListener("change", pintarLista);
+
+/* Vista: lista (por defecto) o iconos grandes. Se recuerda en este navegador. */
+function ponerVista(v){
+  estado.vista = v === "grande" ? "grande" : "lista";
+  Array.prototype.forEach.call(document.querySelectorAll(".vista"), function(b){ b.setAttribute("aria-pressed", String(b.getAttribute("data-vista") === estado.vista)); });
+  try { localStorage.setItem("gc-productos-vista", estado.vista); } catch (e) {}
+  if (estado.centro) pintarLista();
+}
+Array.prototype.forEach.call(document.querySelectorAll(".vista"), function(b){
+  b.addEventListener("click", function(){ ponerVista(b.getAttribute("data-vista")); });
+});
+try { ponerVista(localStorage.getItem("gc-productos-vista")); } catch (e) { ponerVista("lista"); }
+
+/* Se achica a 1200 px como máximo y se pasa a JPG para que el catálogo cargue rápido. */
+function achicar(file){
+  return new Promise(function(ok, mal){
+    var url = URL.createObjectURL(file), im = new Image();
+    im.onload = function(){
+      var e = Math.min(1, 1200 / Math.max(im.width, im.height)), cv = document.createElement("canvas");
+      cv.width = Math.round(im.width * e); cv.height = Math.round(im.height * e);
+      var cx = cv.getContext("2d"); cx.fillStyle = "#fff"; cx.fillRect(0, 0, cv.width, cv.height); cx.drawImage(im, 0, 0, cv.width, cv.height);
+      URL.revokeObjectURL(url);
+      cv.toBlob(function(b){ b ? ok(b) : mal(new Error("imagen")); }, "image/jpeg", 0.85);
+    };
+    im.onerror = function(){ URL.revokeObjectURL(url); mal(new Error("No se pudo leer la imagen " + file.name)); };
+    im.src = url;
+  });
+}
+async function subirImagen(p, file){
+  var blob = await achicar(file);
+  var ruta = estado.centro.id + "/products/" + crypto.randomUUID() + ".jpg";
+  var up = await sb.storage.from(BUCKET).upload(ruta, blob, { contentType: "image/jpeg", upsert: false });
+  if (up.error) throw up.error;
+  var url = sb.storage.from(BUCKET).getPublicUrl(ruta).data.publicUrl;
+  var r = await sb.from("products").update({ image_url: url }).eq("id", p.id);
+  if (r.error) throw r.error;
+  p.image_url = url;
+}
+function errorSubida(e){
+  console.error(e);
+  return /row-level|security|policy|403|Unauthorized/i.test((e && e.message) || "") ? "Solo un usuario administrador del centro puede subir imágenes." : "No pudimos subir la imagen. Probá de nuevo.";
+}
+$("fUna").addEventListener("change", async function(){
+  var f = this.files[0], p = estado.productos.filter(function(x){ return x.id === estado.subiendoId; })[0];
+  if (!f || !p) return;
+  msg("msgImagenes", "", "Subiendo imagen de " + p.name + "…");
+  try { await subirImagen(p, f); msg("msgImagenes", "ok", "Imagen de " + p.name + " guardada."); pintarLista(); }
+  catch (e) { msg("msgImagenes", "err", errorSubida(e)); }
+});
+$("fVarias").addEventListener("change", async function(){
+  var archivos = Array.prototype.slice.call(this.files); this.value = "";
+  if (!archivos.length) return;
+  var porCodigo = {}; estado.productos.forEach(function(p){ if (p.code) porCodigo[normal(p.code)] = p; });
+  var ok = 0, sinProducto = [], fallas = [];
+  for (var i = 0; i < archivos.length; i++) {
+    var f = archivos[i], cod = normal(f.name.replace(/\.[^.]+$/, "")), p = porCodigo[cod];
+    if (!p) { sinProducto.push(f.name); continue; }
+    msg("msgImagenes", "", "Subiendo " + (i + 1) + " de " + archivos.length + "…");
+    try { await subirImagen(p, f); ok++; }
+    catch (e) { fallas.push(f.name); if (/administrador/.test(errorSubida(e))) { msg("msgImagenes", "err", errorSubida(e)); pintarLista(); return; } }
+  }
+  pintarLista();
+  var t = ok + " imágenes guardadas.";
+  if (sinProducto.length) t += "\nSin producto con ese código (" + sinProducto.length + "): " + sinProducto.slice(0, 10).join(", ") + (sinProducto.length > 10 ? "…" : "");
+  if (fallas.length) t += "\nNo se pudieron subir: " + fallas.join(", ");
+  msg("msgImagenes", sinProducto.length || fallas.length ? "err" : "ok", t);
+});
+
+arrancar();
+})();
+</script>
+</body>
+</html>

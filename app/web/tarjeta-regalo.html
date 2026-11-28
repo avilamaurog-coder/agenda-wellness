@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#141416">
+<title>Tarjetas de regalo · Agenda Wellness</title>
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,600;0,700;1,500&display=swap" rel="stylesheet">
+<!--
+  GRUPO CAPYBARA · Agenda Wellness · Tarjetas de regalo (26/11/2026)
+  Se publica junto con la app en Netlify: agenda.grupocapybara.online/tarjeta-regalo.html
+  - Usa la misma sesión que la app (misma dirección web), así que no pide volver a entrar.
+  - Cada centro ve y emite solo sus tarjetas (tabla gift_cards con RLS por center_id).
+  - Arma la tarjeta con nombre, regalo y validez, la guarda con un código único y genera un JPG
+    para mandar por WhatsApp (en el celular se comparte directo; en la compu se descarga o se copia).
+-->
+<style>
+  :root{--bg:#141416;--card:#1C1E22;--line:rgba(255,255,255,.09);--txt:#EAE2D2;--head:#F3EFE7;--muted:#A1A9B1;--gold:#D4A64A;--gold2:#E0B865;--ok:#7BC59A;--err:#E8907E}
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--txt);font:15px/1.5 Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  a{color:var(--gold2)}
+  header{display:flex;align-items:center;gap:12px;padding:14px 20px;border-bottom:1px solid var(--line);position:sticky;top:0;background:rgba(20,20,22,.96);z-index:5}
+  header h1{font-size:18px;margin:0;color:var(--head);font-weight:700}
+  header .sp{flex:1}
+  header .centro{color:var(--muted);font-size:13px}
+  .wrap{max-width:1180px;margin:0 auto;padding:22px 18px 60px}
+  .grid{display:grid;grid-template-columns:minmax(300px,400px) 1fr;gap:22px;align-items:start}
+  @media(max-width:880px){.grid{grid-template-columns:1fr}}
+  .box{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:20px}
+  .box h2{font-size:16px;margin:0 0 14px;color:var(--head)}
+  label{display:block;font-size:13px;font-weight:600;color:var(--muted);margin:12px 0 5px}
+  input,select,textarea{width:100%;background:#141416;color:var(--head);border:1px solid rgba(255,255,255,.14);border-radius:10px;padding:10px 12px;font:inherit;font-size:14.5px}
+  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--gold)}
+  textarea{resize:vertical;min-height:58px}
+  .row{display:flex;gap:10px}.row>div{flex:1;min-width:0}
+  .hint{font-size:12.5px;color:var(--muted);margin-top:4px}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:0;border-radius:11px;padding:11px 16px;font:600 14.5px Inter,system-ui,sans-serif;cursor:pointer;background:var(--gold);color:#141416;text-decoration:none}
+  .btn:hover{background:var(--gold2)}
+  .btn.sec{background:transparent;color:var(--head);border:1px solid rgba(255,255,255,.18)}
+  .btn.sec:hover{border-color:var(--gold)}
+  .btn.wa{background:#25D366;color:#0b2914}.btn.wa:hover{background:#3ee07c}
+  .btn.sm{padding:6px 10px;font-size:13px;border-radius:9px}
+  .btn[disabled]{opacity:.5;cursor:not-allowed}
+  .acciones{display:flex;flex-wrap:wrap;gap:10px;margin-top:16px}
+  .temas{display:flex;gap:8px;flex-wrap:wrap}
+  .tema{border:2px solid transparent;border-radius:10px;padding:7px 11px;cursor:pointer;font-size:13px;font-weight:600;background:#141416;color:var(--head)}
+  .tema.on{border-color:var(--gold)}
+  .tema i{display:inline-block;width:12px;height:12px;border-radius:50%;margin-right:6px;vertical-align:-1px}
+  .preview{position:sticky;top:80px}
+  canvas{width:100%;height:auto;border-radius:14px;display:block;box-shadow:0 10px 40px rgba(0,0,0,.45);background:#000}
+  .msg{font-size:14px;margin-top:12px;min-height:1.2em}
+  .msg.ok{color:var(--ok)}.msg.err{color:var(--err)}
+  .estado{font-size:13px;color:var(--muted);margin-top:10px}
+  .estado b{color:var(--gold2);font-family:ui-monospace,Consolas,monospace}
+  table{width:100%;border-collapse:collapse;font-size:14px}
+  th,td{text-align:left;padding:9px 8px;border-bottom:1px solid var(--line);vertical-align:middle}
+  th{color:var(--muted);font-weight:600;font-size:12.5px}
+  td.cod{font-family:ui-monospace,Consolas,monospace;color:var(--gold2)}
+  .pill{display:inline-block;border-radius:999px;padding:2px 9px;font-size:12px;font-weight:700}
+  .pill.activa{background:rgba(123,197,154,.15);color:var(--ok)}
+  .pill.canjeada{background:rgba(212,166,74,.15);color:var(--gold2)}
+  .pill.vencida,.pill.anulada{background:rgba(232,144,126,.13);color:var(--err)}
+  .tablewrap{overflow-x:auto}
+  .vacio{color:var(--muted);text-align:center;padding:20px}
+  #login{max-width:420px;margin:60px auto}
+  [hidden]{display:none!important}
+</style>
+</head>
+<body>
+<header>
+  <a class="btn sec sm" href="/">← Volver a la agenda</a>
+  <h1>🎁 Tarjetas de regalo</h1>
+  <span class="sp"></span>
+  <span class="centro" id="nombreCentro"></span>
+</header>
+
+<!-- Ingreso (solo si no hay sesión abierta en la app) -->
+<div id="login" class="box" hidden>
+  <h2>Entrá con tu cuenta de la agenda</h2>
+  <form id="formLogin">
+    <label for="lgEmail">Correo</label>
+    <input id="lgEmail" type="email" autocomplete="username" required>
+    <label for="lgPass">Contraseña</label>
+    <input id="lgPass" type="password" autocomplete="current-password" required>
+    <div class="acciones"><button class="btn" type="submit">Entrar</button></div>
+    <div class="msg" id="lgMsg"></div>
+  </form>
+</div>
+
+<div class="wrap" id="app" hidden>
+  <div class="grid">
+    <!-- Formulario -->
+    <div class="box">
+      <h2>Datos de la tarjeta</h2>
+      <form id="form" autocomplete="off">
+        <label for="fCliente">Clienta (opcional)</label>
+        <select id="fCliente"><option value="">— Elegir de mis clientas —</option></select>
+        <div class="hint">Completa el nombre y el WhatsApp. También podés escribirlos a mano.</div>
+
+        <label for="fPara">Para (nombre que va en la tarjeta) *</label>
+        <input id="fPara" maxlength="60" required placeholder="Ej: Sofía">
+
+        <label for="fDe">De parte de (opcional)</label>
+        <input id="fDe" maxlength="60" placeholder="Ej: Tu familia">
+
+        <label for="fRegaloSel">Qué se regala</label>
+        <select id="fRegaloSel"><option value="">— Elegir servicio o combo —</option></select>
+        <input id="fRegalo" maxlength="90" placeholder="Ej: Masaje relajante 60 min" style="margin-top:8px">
+
+        <div class="row">
+          <div>
+            <label for="fMonto">Valor en $ (opcional)</label>
+            <input id="fMonto" type="number" min="0" step="1" placeholder="0 = no mostrar">
+          </div>
+          <div>
+            <label for="fWa">WhatsApp de la clienta</label>
+            <input id="fWa" type="tel" placeholder="Ej: 11 2345 6789">
+          </div>
+        </div>
+
+        <div class="row">
+          <div>
+            <label for="fDesde">Válida desde *</label>
+            <input id="fDesde" type="date" required>
+          </div>
+          <div>
+            <label for="fHasta">Válida hasta *</label>
+            <input id="fHasta" type="date" required>
+          </div>
+        </div>
+
+        <label for="fMensaje">Dedicatoria (opcional)</label>
+        <textarea id="fMensaje" maxlength="140" placeholder="Ej: ¡Feliz cumple! Disfrutalo mucho."></textarea>
+
+        <label>Diseño</label>
+        <div class="temas" id="temas">
+          <button type="button" class="tema on" data-tema="noche"><i style="background:#D4A64A"></i>Dorado</button>
+          <button type="button" class="tema" data-tema="rosa"><i style="background:#c46b82"></i>Rosa</button>
+          <button type="button" class="tema" data-tema="spa"><i style="background:#5f8f6c"></i>Spa</button>
+          <button type="button" class="tema" data-tema="propia"><i style="background:linear-gradient(135deg,#fff,#888)"></i>Mi plantilla</button>
+        </div>
+        <div id="zonaPlantilla" hidden>
+          <label for="fPlantilla">Imagen de tu tarjeta (JPG o PNG)</label>
+          <input id="fPlantilla" type="file" accept="image/*">
+          <div class="hint">Tu imagen va de fondo y los datos se acomodan con el mismo diseño de la tarjeta (logo, nombre, regalo, validez y código). Ideal 1600×1000 px. Queda guardada en este navegador para la próxima vez.</div>
+          <label for="fFranja">Tono del texto</label>
+          <select id="fFranja"><option value="oscura">Imagen oscura (texto claro)</option><option value="clara">Imagen clara (texto oscuro)</option></select>
+        </div>
+
+        <div class="acciones">
+          <button class="btn" type="submit" id="btnGuardar">Guardar y generar</button>
+          <button class="btn sec" type="button" id="btnNueva">Nueva tarjeta</button>
+        </div>
+        <div class="msg" id="msg"></div>
+      </form>
+    </div>
+
+    <!-- Vista previa -->
+    <div class="preview">
+      <div class="box">
+        <h2>Vista previa</h2>
+        <canvas id="lienzo" width="1600" height="1000"></canvas>
+        <div class="estado" id="estado">Todavía no está guardada: el código se asigna al tocar "Guardar y generar".</div>
+        <div class="acciones">
+          <button class="btn wa" type="button" id="btnWa" disabled>Enviar por WhatsApp</button>
+          <button class="btn sec" type="button" id="btnBajar" disabled>Descargar JPG</button>
+          <button class="btn sec" type="button" id="btnCopiar" disabled>Copiar imagen</button>
+        </div>
+        <div class="msg" id="msgEnvio"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="box" style="margin-top:22px">
+    <h2>Tarjetas emitidas</h2>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Código</th><th>Para</th><th>Regalo</th><th>Válida hasta</th><th>Estado</th><th></th></tr></thead>
+        <tbody id="lista"><tr><td colspan="6" class="vacio">Cargando…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+(function(){
+"use strict";
+var SB_URL = "https://qmjrndimibjoxrigvmgt.supabase.co";
+var SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFtanJuZGltaWJqb3hyaWd2bWd0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTUyODY1MTQsImV4cCI6MjExMDg2MjUxNH0.HNS36EbHA7FO84XTXsr6JN9CElkwoep8CbBd8wDm84c";
+var CLAVE_SESION = "sb-qmjrndimibjoxrigvmgt-auth-token";
+
+function $(id){ return document.getElementById(id); }
+
+/* La app Flutter guarda la sesión en esta misma clave, pero sin "expires_at".
+   Se lo calculamos desde el token para que esta página sepa si hay que renovarlo. */
+(function prepararSesion(){
+  try {
+    var crudo = localStorage.getItem(CLAVE_SESION);
+    if (!crudo) return;
+    var s = JSON.parse(crudo);
+    if (typeof s === "string") s = JSON.parse(s);
+    if (s && s.currentSession) s = s.currentSession;
+    if (!s || !s.access_token) return;
+    if (!s.expires_at) {
+      var pl = JSON.parse(atob(s.access_token.split(".")[1].replace(/-/g,"+").replace(/_/g,"/")));
+      s.expires_at = pl.exp;
+    }
+    localStorage.setItem(CLAVE_SESION, JSON.stringify(s));
+  } catch (e) { /* si no se entiende, se pide ingresar */ }
+})();
+
+var sb = supabase.createClient(SB_URL, SB_KEY, { auth: { storageKey: CLAVE_SESION, persistSession: true, autoRefreshToken: true, detectSessionInUrl: false } });
+
+var estado = {
+  centro: null, clientes: [], regalos: [], tarjetas: [],
+  tema: "noche", plantilla: null, tarjeta: null, conDetalle: true, logo: null
+};
+
+var TEMAS = {
+  noche: { bg1:"#141416", bg2:"#2a241a", acento:"#D4A64A", acento2:"#F0CF80", texto:"#F3EFE7", suave:"#B8B2A6", panel:"rgba(255,255,255,.05)" },
+  rosa:  { bg1:"#fdf3f4", bg2:"#f1d3d9", acento:"#b5536b", acento2:"#d98aa0", texto:"#3b2a2e", suave:"#7d6267", panel:"rgba(255,255,255,.55)" },
+  spa:   { bg1:"#eef4ef", bg2:"#cbdccf", acento:"#4f7a5c", acento2:"#86ad90", texto:"#22332a", suave:"#5d7064", panel:"rgba(255,255,255,.5)" }
+};
+
+/* ---------- utilidades ---------- */
+function hoyISO(){ var d=new Date(); d.setMinutes(d.getMinutes()-d.getTimezoneOffset()); return d.toISOString().slice(0,10); }
+function sumarDias(iso, n){ var d=new Date(iso+"T12:00:00"); d.setDate(d.getDate()+n); return d.toISOString().slice(0,10); }
+function fecha(iso){ if(!iso) return ""; var p=iso.split("-"); return p[2]+"/"+p[1]+"/"+p[0]; }
+function pesos(n){ return "$ " + Number(n).toLocaleString("es-AR", {maximumFractionDigits:0}); }
+function msg(el, tipo, texto){ el.className = "msg " + (tipo||""); el.textContent = texto || ""; }
+function telWa(t){
+  var d = String(t||"").replace(/\D/g,"");
+  if (!d) return "";
+  if (d.indexOf("00")===0) d = d.slice(2);
+  if (d.indexOf("54")===0) return d;
+  if (d.charAt(0)==="0") d = d.slice(1);
+  if (d.length===10) return "549"+d;      // característica + número (Argentina)
+  return d;
+}
+function cargarImagen(src){
+  return new Promise(function(ok){
+    if(!src) return ok(null);
+    var im = new Image(); im.crossOrigin = "anonymous";
+    im.onload = function(){ ok(im); }; im.onerror = function(){ ok(null); };
+    im.src = src;
+  });
+}
+function estadoReal(t){ return (t.status==="activa" && t.valid_until < hoyISO()) ? "vencida" : t.status; }
+
+/* ---------- ingreso ---------- */
+async function arrancar(){
+  var r = await sb.auth.getSession();
+  var ses = r.data && r.data.session;
+  if (!ses) { $("login").hidden = false; return; }
+  try { await cargarDatos(ses.user); }
+  catch (e) {
+    console.error(e);
+    $("login").hidden = false; $("app").hidden = true;
+    msg($("lgMsg"), "err", "No pudimos abrir tu centro. Entrá de nuevo con tu correo y contraseña.");
+  }
+}
+$("formLogin").addEventListener("submit", async function(ev){
+  ev.preventDefault();
+  msg($("lgMsg"), "", "Entrando…");
+  var r = await sb.auth.signInWithPassword({ email: $("lgEmail").value.trim(), password: $("lgPass").value });
+  if (r.error) return msg($("lgMsg"), "err", "Correo o contraseña incorrectos.");
+  $("lgPass").value = "";
+  try { await cargarDatos(r.data.user); $("login").hidden = true; }
+  catch(e){ console.error(e); msg($("lgMsg"), "err", e.message || "No pudimos abrir tu centro."); }
+});
+
+async function cargarDatos(user){
+  var cid = null;
+  var p = await sb.from("profiles").select("center_id").eq("id", user.id).maybeSingle();
+  if (p.data && p.data.center_id) cid = p.data.center_id;
+  if (!cid) { var rc = await sb.rpc("current_center_id"); if (!rc.error) cid = rc.data; }
+  if (!cid) throw new Error("Tu cuenta todavía no tiene un centro activo en la agenda.");
+
+  var c = await sb.from("centers").select("id,name,logo_url,phone,whatsapp_contact,instagram,address").eq("id", cid).maybeSingle();
+  if (c.error || !c.data) throw new Error("No pudimos leer los datos de tu centro.");
+  estado.centro = c.data;
+  $("nombreCentro").textContent = c.data.name || "";
+
+  var res = await Promise.all([
+    sb.from("clients").select("id,first_name,last_name,whatsapp,phone").is("deleted_at", null).order("first_name").limit(2000),
+    sb.from("services").select("id,name,price,promo_price").eq("is_active", true).is("deleted_at", null).order("name"),
+    sb.from("combos").select("id,name,price").eq("is_active", true).order("name"),
+    cargarImagen(c.data.logo_url)
+  ]);
+  estado.clientes = res[0].data || [];
+  estado.logo = res[3];
+  estado.regalos = [];
+  (res[1].data||[]).forEach(function(s){ estado.regalos.push({ nombre: s.name, precio: s.promo_price || s.price }); });
+  (res[2].data||[]).forEach(function(s){ estado.regalos.push({ nombre: s.name, precio: s.price, combo: true }); });
+
+  var selC = $("fCliente");
+  estado.clientes.forEach(function(cl, i){
+    var o = document.createElement("option"); o.value = i;
+    o.textContent = [cl.first_name, cl.last_name].filter(Boolean).join(" ");
+    selC.appendChild(o);
+  });
+  var selR = $("fRegaloSel");
+  estado.regalos.forEach(function(g, i){
+    var o = document.createElement("option"); o.value = i;
+    o.textContent = (g.combo ? "Combo · " : "") + g.nombre + (g.precio ? " (" + pesos(g.precio) + ")" : "");
+    selR.appendChild(o);
+  });
+
+  try { estado.plantilla = await cargarImagen(localStorage.getItem("gc-tarjeta-plantilla-" + cid)); } catch(e){}
+
+  $("app").hidden = false;
+  nuevaTarjeta();
+  await cargarLista();
+}
+
+/* ---------- formulario ---------- */
+function leerForm(){
+  return {
+    para: $("fPara").value.trim(),
+    de: $("fDe").value.trim(),
+    regalo: $("fRegalo").value.trim(),
+    monto: Number($("fMonto").value) || 0,
+    wa: $("fWa").value.trim(),
+    desde: $("fDesde").value,
+    hasta: $("fHasta").value,
+    mensaje: $("fMensaje").value.trim(),
+    codigo: estado.tarjeta ? estado.tarjeta.code : ""
+  };
+}
+function bloquearForm(si){
+  ["fCliente","fPara","fDe","fRegaloSel","fRegalo","fMonto","fDesde","fHasta","fMensaje"].forEach(function(id){ $(id).disabled = si; });
+  $("btnGuardar").disabled = si;
+  ["btnWa","btnBajar","btnCopiar"].forEach(function(id){ $(id).disabled = !si; });
+}
+function nuevaTarjeta(){
+  estado.tarjeta = null;
+  $("form").reset();
+  $("fDesde").value = hoyISO();
+  $("fHasta").value = sumarDias(hoyISO(), 60);
+  bloquearForm(false);
+  $("estado").textContent = "Todavía no está guardada: el código se asigna al tocar \"Guardar y generar\".";
+  msg($("msg")); msg($("msgEnvio"));
+  dibujar();
+}
+$("btnNueva").addEventListener("click", nuevaTarjeta);
+
+$("fCliente").addEventListener("change", function(){
+  var cl = estado.clientes[this.value];
+  if (!cl) return;
+  $("fPara").value = cl.first_name || "";
+  $("fWa").value = cl.whatsapp || cl.phone || "";
+  dibujar();
+});
+$("fRegaloSel").addEventListener("change", function(){
+  var g = estado.regalos[this.value];
+  if (!g) return;
+  $("fRegalo").value = g.nombre;
+  if (g.precio && !$("fMonto").value) $("fMonto").value = Math.round(g.precio);
+  dibujar();
+});
+["fPara","fDe","fRegalo","fMonto","fDesde","fHasta","fMensaje"].forEach(function(id){ $(id).addEventListener("input", dibujar); });
+
+$("temas").addEventListener("click", function(ev){
+  var b = ev.target.closest(".tema"); if (!b) return;
+  estado.tema = b.getAttribute("data-tema");
+  Array.prototype.forEach.call(document.querySelectorAll(".tema"), function(x){ x.classList.toggle("on", x===b); });
+  $("zonaPlantilla").hidden = estado.tema !== "propia";
+  dibujar();
+});
+$("fFranja").addEventListener("change", dibujar);
+$("fPlantilla").addEventListener("change", function(){
+  var f = this.files && this.files[0]; if (!f) return;
+  var lector = new FileReader();
+  lector.onload = async function(){
+    var im = await cargarImagen(lector.result);
+    if (!im) return msg($("msg"), "err", "No pudimos leer esa imagen. Probá con un JPG o PNG.");
+    // Se achica a 1600 px de ancho para que entre en el navegador y el JPG pese poco.
+    var esc = Math.min(1, 1600 / im.width), cv = document.createElement("canvas");
+    cv.width = Math.round(im.width*esc); cv.height = Math.round(im.height*esc);
+    cv.getContext("2d").drawImage(im, 0, 0, cv.width, cv.height);
+    var datos = cv.toDataURL("image/jpeg", 0.88);
+    estado.plantilla = await cargarImagen(datos);
+    try { localStorage.setItem("gc-tarjeta-plantilla-" + estado.centro.id, datos); }
+    catch(e){ msg($("msg"), "err", "La imagen es muy pesada para guardarla en este navegador; se usa solo ahora."); }
+    dibujar();
+  };
+  lector.readAsDataURL(f);
+});
+
+/* ---------- guardar ---------- */
+$("form").addEventListener("submit", async function(ev){
+  ev.preventDefault();
+  var d = leerForm();
+  if (!d.para) return msg($("msg"), "err", "Falta el nombre de quien recibe la tarjeta.");
+  if (!d.desde || !d.hasta) return msg($("msg"), "err", "Completá las fechas de validez.");
+  if (d.hasta < d.desde) return msg($("msg"), "err", "La fecha \"hasta\" tiene que ser posterior a \"desde\".");
+  if (estado.tema === "propia" && !estado.plantilla) return msg($("msg"), "err", "Subí la imagen de tu plantilla o elegí otro diseño.");
+
+  $("btnGuardar").disabled = true; msg($("msg"), "", "Guardando…");
+  var base = { recipient_name: d.para, amount: d.monto, valid_from: d.desde, valid_until: d.hasta };
+  var extra = { description: d.regalo || null, sender_name: d.de || null, message: d.mensaje || null, theme: estado.tema,
+                client_id: ($("fCliente").value !== "" && estado.clientes[$("fCliente").value]) ? estado.clientes[$("fCliente").value].id : null };
+  var r = await sb.from("gift_cards").insert(estado.conDetalle ? Object.assign({}, base, extra) : base).select().single();
+  if (r.error && estado.conDetalle && /column|schema cache/i.test(r.error.message)) {
+    // La base todavía no tiene las columnas de la migración 09: se guarda lo básico.
+    estado.conDetalle = false;
+    r = await sb.from("gift_cards").insert(base).select().single();
+  }
+  if (r.error) {
+    $("btnGuardar").disabled = false;
+    console.error(r.error);
+    return msg($("msg"), "err", "No pudimos guardar la tarjeta. Probá de nuevo en un momento.");
+  }
+  estado.tarjeta = r.data;
+  bloquearForm(true);
+  msg($("msg"), "ok", "¡Listo! Tarjeta guardada con el código " + r.data.code + ".");
+  $("estado").innerHTML = "Código <b></b> · lista para enviar.";
+  $("estado").querySelector("b").textContent = r.data.code;
+  dibujar();
+  cargarLista();
+});
+
+/* ---------- dibujo ---------- */
+var lienzo = $("lienzo"), ctx = lienzo.getContext("2d");
+var fuentesListas = false;
+Promise.all([
+  document.fonts.load("700 80px 'Playfair Display'"), document.fonts.load("italic 500 50px 'Playfair Display'"),
+  document.fonts.load("600 30px Inter"), document.fonts.load("400 30px Inter")
+]).then(function(){ fuentesListas = true; dibujar(); }).catch(function(){});
+
+function ajustarFuente(texto, estilo, tam, min, ancho){
+  var t = tam;
+  do { ctx.font = estilo.replace("{t}", t); if (ctx.measureText(texto).width <= ancho) break; t -= 2; } while (t > min);
+  return t;
+}
+function lineas(texto, ancho, max){
+  var pal = String(texto).split(/\s+/), out = [], act = "";
+  pal.forEach(function(p){
+    var prueba = act ? act + " " + p : p;
+    if (ctx.measureText(prueba).width > ancho && act) { out.push(act); act = p; } else act = prueba;
+  });
+  if (act) out.push(act);
+  if (out.length > max) { out = out.slice(0, max); out[max-1] = out[max-1].replace(/\s*\S*$/, "") + "…"; }
+  return out;
+}
+function rrect(x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+function espaciado(px){ if ("letterSpacing" in ctx) ctx.letterSpacing = px + "px"; }
+
+function dibujar(){
+  if (!estado.centro) return;
+  var d = leerForm();
+  if (estado.tema === "propia" && estado.plantilla) {
+    // Misma estructura que los diseños fijos, con la imagen subida de fondo.
+    var clara = $("fFranja").value === "clara";
+    return dibujarTema(d, clara ? TEMAS.rosa : TEMAS.noche, estado.plantilla, clara);
+  }
+  dibujarTema(d, TEMAS[estado.tema] || TEMAS.noche);
+}
+
+function dibujarTema(d, T, fondo, clara){
+  var W = 1600, H = 1000;
+  lienzo.width = W; lienzo.height = H;
+  if (fondo) {
+    // La imagen cubre toda la tarjeta (recortada al centro si tiene otra proporción).
+    var e = Math.max(W / fondo.width, H / fondo.height), fw = fondo.width * e, fh = fondo.height * e;
+    ctx.drawImage(fondo, (W - fw) / 2, (H - fh) / 2, fw, fh);
+    // Velo sobre la zona de texto para que se lea bien sobre cualquier imagen.
+    var c = clara ? "255,255,255" : "20,20,22";
+    var v = ctx.createLinearGradient(0, 0, 1240, 0);
+    v.addColorStop(0, "rgba("+c+",.82)"); v.addColorStop(.75, "rgba("+c+",.6)"); v.addColorStop(1, "rgba("+c+",.1)");
+    ctx.fillStyle = v; ctx.fillRect(0, 0, W, H);
+  } else {
+    var g = ctx.createLinearGradient(0, 0, W, H); g.addColorStop(0, T.bg1); g.addColorStop(1, T.bg2);
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  }
+  // brillo suave
+  var rg = ctx.createRadialGradient(1300, 150, 10, 1300, 150, 700);
+  rg.addColorStop(0, T.acento2 + "33"); rg.addColorStop(1, T.acento2 + "00");
+  ctx.fillStyle = rg; ctx.fillRect(0, 0, W, H);
+  // marco
+  ctx.strokeStyle = T.acento; ctx.globalAlpha = .55; ctx.lineWidth = 3; rrect(36, 36, W-72, H-72, 30); ctx.stroke(); ctx.globalAlpha = 1;
+  // cinta vertical (columna derecha)
+  var cx = 1345;
+  var cg = ctx.createLinearGradient(cx-34, 0, cx+34, 0); cg.addColorStop(0, T.acento); cg.addColorStop(.5, T.acento2); cg.addColorStop(1, T.acento);
+  ctx.fillStyle = cg; ctx.fillRect(cx-30, 38, 60, H-76);
+
+  // logo o inicial
+  ctx.save();
+  ctx.beginPath(); ctx.arc(cx, 400, 138, 0, Math.PI*2); ctx.fillStyle = "#ffffff"; ctx.fill();
+  ctx.lineWidth = 8; ctx.strokeStyle = T.acento; ctx.stroke();
+  ctx.beginPath(); ctx.arc(cx, 400, 124, 0, Math.PI*2); ctx.clip();
+  if (estado.logo) {
+    var L = estado.logo, e = Math.min(230/L.width, 230/L.height);
+    ctx.drawImage(L, cx - L.width*e/2, 400 - L.height*e/2, L.width*e, L.height*e);
+  } else {
+    ctx.fillStyle = T.acento; ctx.font = "700 120px 'Playfair Display', Georgia, serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText((estado.centro.name||"?").charAt(0).toUpperCase(), cx, 408);
+  }
+  ctx.restore();
+
+  // nombre del centro debajo del logo
+  ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
+  ctx.fillStyle = T.texto; ctx.font = "700 36px 'Playfair Display', Georgia, serif";
+  var ln = lineas(estado.centro.name || "", 290, 2), y = 600;
+  ctx.save(); ctx.shadowColor = T.bg1; ctx.shadowBlur = 0;
+  ln.forEach(function(l){ var w = ctx.measureText(l).width; ctx.fillStyle = T.bg1; ctx.globalAlpha=.85; rrect(cx-w/2-14, y-36, w+28, 48, 10); ctx.fill(); ctx.globalAlpha=1; ctx.fillStyle = T.texto; ctx.fillText(l, cx, y); y += 50; });
+  ctx.restore();
+  // Solo Instagram: el teléfono no se imprime en la tarjeta.
+  var contacto = [estado.centro.instagram ? "@" + String(estado.centro.instagram).replace(/^@/,"").replace(/^https?:\/\/(www\.)?instagram\.com\//,"").replace(/\/$/,"") : ""].filter(Boolean);
+  ctx.font = "500 24px Inter, system-ui, sans-serif";
+  var yc = 860 - (contacto.length-1)*34;
+  contacto.forEach(function(t){ var w = ctx.measureText(t).width; ctx.fillStyle = T.bg1; ctx.globalAlpha=.85; rrect(cx-w/2-12, yc-28, w+24, 38, 9); ctx.fill(); ctx.globalAlpha=1; ctx.fillStyle = T.texto; ctx.fillText(t, cx, yc); yc += 40; });
+
+  // textos de la izquierda
+  var X = 120, ANCHO = 1040;
+  ctx.textAlign = "left";
+  ctx.fillStyle = T.acento; ctx.font = "600 30px Inter, system-ui, sans-serif"; espaciado(7);
+  ctx.fillText("TARJETA DE REGALO", X, 170); espaciado(0);
+
+  var para = d.para || "Nombre";
+  ctx.fillStyle = T.texto;
+  ajustarFuente("Para " + para, "700 {t}px 'Playfair Display', Georgia, serif", 96, 54, ANCHO);
+  ctx.fillText("Para " + para, X, 290);
+  y = 290;
+  if (d.de) { y += 64; ctx.fillStyle = T.suave; ajustarFuente("De parte de " + d.de, "400 {t}px Inter, system-ui, sans-serif", 34, 24, ANCHO); ctx.fillText("De parte de " + d.de, X, y); }
+
+  y += 52;
+  ctx.fillStyle = T.acento; ctx.fillRect(X, y, 120, 4);
+  y += 30;
+  if (d.regalo) {
+    ctx.fillStyle = T.texto; ctx.font = "italic 500 54px 'Playfair Display', Georgia, serif";
+    lineas(d.regalo, ANCHO, 2).forEach(function(l){ y += 62; ctx.fillText(l, X, y); });
+  }
+  if (d.monto > 0) {
+    y += 62; ctx.fillStyle = T.acento; ctx.font = "700 44px Inter, system-ui, sans-serif"; ctx.fillText("Valor " + pesos(d.monto), X, y);
+  }
+  if (d.mensaje) {
+    ctx.fillStyle = T.suave; ctx.font = "italic 400 32px Inter, system-ui, sans-serif";
+    y += 20;
+    lineas("“" + d.mensaje + "”", ANCHO, 2).forEach(function(l){ y += 44; if (y < 820) ctx.fillText(l, X, y); });
+  }
+
+  // pie: validez y código
+  ctx.fillStyle = T.panel; rrect(X-20, 840, ANCHO+40, 82, 16); ctx.fill();
+  ctx.fillStyle = T.texto; ctx.font = "600 30px Inter, system-ui, sans-serif";
+  ctx.fillText(validez(d), X+6, 892);
+  ctx.textAlign = "right"; ctx.fillStyle = T.acento; ctx.font = "700 30px Consolas, ui-monospace, monospace";
+  ctx.fillText(d.codigo ? "Código " + d.codigo : "Código GC-········", X+ANCHO+6, 892);
+  ctx.textAlign = "left";
+}
+
+function validez(d){
+  if (d.desde && d.desde > hoyISO()) return "Válida del " + fecha(d.desde) + " al " + fecha(d.hasta);
+  return d.hasta ? "Válida hasta el " + fecha(d.hasta) : "";
+}
+
+/* ---------- envío ---------- */
+function nombreArchivo(){ return "tarjeta-regalo-" + (estado.tarjeta ? estado.tarjeta.code : "borrador") + ".jpg"; }
+function aBlob(){ return new Promise(function(ok){ lienzo.toBlob(ok, "image/jpeg", 0.92); }); }
+function textoWa(){
+  var d = leerForm();
+  return "¡Hola " + d.para + "! 🎁 Tenés una tarjeta de regalo en " + (estado.centro.name || "nuestro centro") +
+    (d.regalo ? " para " + d.regalo : "") + ". " + validez(d) + ". Código: " + d.codigo +
+    ". Escribinos para reservar tu turno.";
+}
+function bajar(blob){
+  var a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = nombreArchivo();
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(function(){ URL.revokeObjectURL(a.href); }, 4000);
+}
+
+$("btnWa").addEventListener("click", async function(){
+  var blob = await aBlob();
+  var archivo = new File([blob], nombreArchivo(), { type: "image/jpeg" });
+  // En el celular: menú de compartir del teléfono → WhatsApp, con la imagen adjunta.
+  if (navigator.canShare && navigator.canShare({ files: [archivo] })) {
+    try { await navigator.share({ files: [archivo], text: textoWa() }); msg($("msgEnvio"), "ok", "Elegí WhatsApp y el chat de la clienta."); return; }
+    catch (e) { if (e && e.name === "AbortError") return; }
+  }
+  // En la compu: WhatsApp no deja adjuntar imágenes desde un enlace. Se descarga el JPG y se abre el chat.
+  bajar(blob);
+  var tel = telWa($("fWa").value);
+  window.open("https://wa.me/" + tel + "?text=" + encodeURIComponent(textoWa()), "_blank", "noopener");
+  msg($("msgEnvio"), "ok", "Se descargó la imagen y se abrió WhatsApp" + (tel ? "" : " (sin número: elegí el chat)") + ". Adjuntá el JPG en el chat (clip 📎 o arrastrándolo).");
+});
+$("btnBajar").addEventListener("click", async function(){ bajar(await aBlob()); });
+$("btnCopiar").addEventListener("click", async function(){
+  try {
+    var png = await new Promise(function(ok){ lienzo.toBlob(ok, "image/png"); });
+    await navigator.clipboard.write([new ClipboardItem({ "image/png": png })]);
+    msg($("msgEnvio"), "ok", "Imagen copiada. Pegala en el chat de WhatsApp Web con Ctrl+V.");
+  } catch (e) { msg($("msgEnvio"), "err", "Este navegador no deja copiar imágenes. Usá \"Descargar JPG\"."); }
+});
+
+/* ---------- listado ---------- */
+async function cargarLista(){
+  var r = await sb.from("gift_cards").select("*").order("created_at", { ascending: false }).limit(50);
+  var tb = $("lista"); tb.innerHTML = "";
+  if (r.error) { tb.innerHTML = '<tr><td colspan="6" class="vacio">No pudimos cargar las tarjetas.</td></tr>'; return; }
+  estado.tarjetas = r.data || [];
+  if (!estado.tarjetas.length) { tb.innerHTML = '<tr><td colspan="6" class="vacio">Todavía no emitiste tarjetas.</td></tr>'; return; }
+  estado.tarjetas.forEach(function(t){
+    var tr = document.createElement("tr"), st = estadoReal(t);
+    function td(txt, cls){ var c = document.createElement("td"); if (cls) c.className = cls; c.textContent = txt; tr.appendChild(c); return c; }
+    td(t.code, "cod"); td(t.recipient_name); td(t.description || (t.amount > 0 ? pesos(t.amount) : "—")); td(fecha(t.valid_until));
+    var cs = td(""); var pill = document.createElement("span"); pill.className = "pill " + st; pill.textContent = st; cs.appendChild(pill);
+    var ca = td(""); ca.style.whiteSpace = "nowrap";
+    var bv = document.createElement("button"); bv.className = "btn sec sm"; bv.type = "button"; bv.textContent = "Ver / reenviar";
+    bv.addEventListener("click", function(){ abrirTarjeta(t); }); ca.appendChild(bv);
+    if (st === "activa") {
+      var bc = document.createElement("button"); bc.className = "btn sec sm"; bc.type = "button"; bc.textContent = "Marcar canjeada"; bc.style.marginLeft = "6px";
+      bc.addEventListener("click", function(){ cambiarEstado(t, "canjeada"); }); ca.appendChild(bc);
+      var ba = document.createElement("button"); ba.className = "btn sec sm"; ba.type = "button"; ba.textContent = "Anular"; ba.style.marginLeft = "6px";
+      ba.addEventListener("click", function(){ if (confirm("¿Anular la tarjeta " + t.code + "? Ya no se podrá canjear.")) cambiarEstado(t, "anulada"); }); ca.appendChild(ba);
+    }
+    tb.appendChild(tr);
+  });
+}
+async function cambiarEstado(t, nuevo){
+  var cambios = { status: nuevo }; if (nuevo === "canjeada") cambios.redeemed_at = new Date().toISOString();
+  var r = await sb.from("gift_cards").update(cambios).eq("id", t.id);
+  if (r.error) { console.error(r.error); alert("No pudimos actualizar la tarjeta. Probá de nuevo."); return; }
+  cargarLista();
+}
+function abrirTarjeta(t){
+  estado.tarjeta = t;
+  $("fCliente").value = "";
+  $("fPara").value = t.recipient_name || "";
+  $("fDe").value = t.sender_name || "";
+  $("fRegaloSel").value = "";
+  $("fRegalo").value = t.description || "";
+  $("fMonto").value = t.amount > 0 ? Math.round(t.amount) : "";
+  $("fDesde").value = t.valid_from; $("fHasta").value = t.valid_until;
+  $("fMensaje").value = t.message || "";
+  var cl = t.client_id && estado.clientes.filter(function(c){ return c.id === t.client_id; })[0];
+  $("fWa").value = cl ? (cl.whatsapp || cl.phone || "") : "";
+  if (t.theme && document.querySelector('.tema[data-tema="' + t.theme + '"]')) document.querySelector('.tema[data-tema="' + t.theme + '"]').click();
+  bloquearForm(true);
+  $("estado").innerHTML = "Código <b></b> · " + estadoReal(t) + ".";
+  $("estado").querySelector("b").textContent = t.code;
+  msg($("msg")); msg($("msgEnvio"));
+  dibujar();
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+arrancar();
+})();
+</script>
+</body>
+</html>

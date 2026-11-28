@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#141416">
+<title>Catálogo</title>
+<link rel="icon" type="image/png" href="/favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+<!--
+  GRUPO CAPYBARA · Agenda Wellness · Catálogo público con pedido / presupuesto (28/11/2026)
+  Se sirve en agenda.grupocapybara.online/catalogo (ver _redirects y .htaccess), que es el enlace
+  que comparte la app con "Compartir catálogo".
+  - Lee el catálogo con la función public_catalog() (servicios, combos, productos y promos).
+  - Quien lo recibe elige varios ítems con cantidades; se arma un pedido o presupuesto con totales.
+  - Se envía por WhatsApp al número del centro, o se imprime / guarda como PDF.
+  - El carrito queda guardado en el navegador hasta que se envía o se vacía.
+-->
+<style>
+  :root{--bg:#141416;--card:#1C1E22;--card2:#23262b;--line:rgba(255,255,255,.09);--txt:#EAE2D2;--head:#F3EFE7;--muted:#A1A9B1;--gold:#D4A64A;--gold2:#E0B865;--ok:#7BC59A;--err:#E8907E}
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--txt);font:15px/1.5 Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  a{color:var(--gold2)}
+  button{font:inherit}
+  [hidden]{display:none!important}
+  .wrap{max-width:1100px;margin:0 auto;padding:0 16px 140px}
+
+  .marca{display:flex;align-items:center;gap:16px;padding:26px 0 18px}
+  .marca img{width:78px;height:78px;border-radius:50%;object-fit:contain;background:#fff;border:3px solid var(--gold)}
+  .marca .ini{width:78px;height:78px;border-radius:50%;display:grid;place-items:center;background:#fff;color:var(--gold);font:700 38px 'Playfair Display',Georgia,serif;border:3px solid var(--gold)}
+  .marca h1{font:700 28px/1.15 'Playfair Display',Georgia,serif;color:var(--head);margin:0}
+  .marca p{margin:4px 0 0;color:var(--muted);font-size:14px}
+  .contacto{display:flex;flex-wrap:wrap;gap:8px 16px;font-size:13.5px;color:var(--muted);margin-bottom:8px}
+
+  .compartir{background:var(--card2);border:1px dashed rgba(212,166,74,.5);border-radius:12px;padding:12px 14px;font-size:14px;margin:8px 0 12px;color:var(--txt)}
+  .compartir b{color:var(--head)}
+  .fila-link{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+  .fila-link input{flex:1;min-width:220px;font-family:ui-monospace,Consolas,monospace;font-size:13px}
+  .fila-link .btn{padding:9px 14px;font-size:14px}
+  .aviso{background:rgba(212,166,74,.1);border:1px solid rgba(212,166,74,.3);color:var(--head);border-radius:12px;padding:10px 14px;font-size:14px;margin:8px 0 18px}
+
+  .promos{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;margin-bottom:18px}
+  .promo{background:linear-gradient(135deg,#2a241a,#1C1E22);border:1px solid rgba(212,166,74,.35);border-radius:14px;overflow:hidden;display:flex;flex-direction:column}
+  .promo img{width:100%;height:140px;object-fit:cover}
+  .promo .in{padding:12px 14px;flex:1;display:flex;flex-direction:column;gap:6px}
+  .promo b{color:var(--head)}
+  .promo span{font-size:13.5px;color:var(--muted)}
+
+  .barra{position:sticky;top:0;z-index:4;background:rgba(20,20,22,.96);padding:10px 0;display:flex;gap:10px;flex-wrap:wrap;align-items:center;border-bottom:1px solid var(--line);margin-bottom:16px}
+  .tabs{display:flex;gap:6px;flex-wrap:wrap}
+  .tab{border:1px solid rgba(255,255,255,.16);background:transparent;color:var(--head);border-radius:999px;padding:7px 14px;cursor:pointer;font-size:14px;font-weight:600}
+  .tab.on{background:var(--gold);border-color:var(--gold);color:#141416}
+  .buscar{flex:1;min-width:140px}
+  input,select,textarea{width:100%;background:#141416;color:var(--head);border:1px solid rgba(255,255,255,.16);border-radius:10px;padding:10px 12px;font:inherit;font-size:14.5px}
+  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--gold)}
+  textarea{resize:vertical;min-height:60px}
+
+  .grupo{font:700 20px 'Playfair Display',Georgia,serif;color:var(--head);margin:22px 0 10px}
+  .lista{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
+  .item{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden;display:flex;flex-direction:column}
+  .item.sel{border-color:var(--gold)}
+  .item img{width:100%;height:150px;object-fit:cover;background:#111}
+  .item .in{padding:12px 14px;display:flex;flex-direction:column;gap:4px;flex:1}
+  .item h3{margin:0;font-size:15.5px;color:var(--head)}
+  .item .cat{font-size:12px;color:var(--gold2);text-transform:uppercase;letter-spacing:.06em}
+  .item .desc{font-size:13.5px;color:var(--muted)}
+  .item .pie{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:auto;padding-top:10px}
+  .item .ph{display:none}
+  .item .txt{display:flex;flex-direction:column;gap:4px}
+
+  /* Selector de vista: iconos grandes (por defecto) o lista */
+  .vistas{display:inline-flex;border:1px solid rgba(255,255,255,.16);border-radius:10px;overflow:hidden}
+  .vista{border:0;background:transparent;color:var(--muted);padding:8px 12px;cursor:pointer;font-size:13.5px;font-weight:600;white-space:nowrap}
+  .vista[aria-pressed="true"]{background:var(--gold);color:#141416}
+  #listas.grande .lista{grid-template-columns:repeat(auto-fill,minmax(260px,1fr))}
+  #listas.grande .item img{height:210px}
+  #listas.lista .lista{grid-template-columns:1fr;gap:8px}
+  #listas.lista .item{flex-direction:row;align-items:center;border-radius:12px}
+  #listas.lista .item img,#listas.lista .item .ph{display:block;width:76px;height:76px;flex:none;margin:8px 0 8px 8px;border-radius:10px;object-fit:cover}
+  #listas.lista .item .ph{display:grid;place-items:center;background:#141416;border:1px dashed rgba(255,255,255,.15);color:var(--muted);font-size:22px}
+  #listas.lista .item .in{flex-direction:row;align-items:center;gap:14px;padding:8px 12px;min-width:0}
+  #listas.lista .item .txt{flex:1;min-width:0}
+  #listas.lista .item .desc{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #listas.lista .item .pie{margin:0;padding:0;flex:none;flex-direction:column;align-items:flex-end;gap:6px}
+  @media (max-width:560px){
+    #listas.lista .item .in{flex-direction:column;align-items:stretch;gap:6px}
+    #listas.lista .item .pie{flex-direction:row;align-items:center;justify-content:space-between}
+    #listas.lista .item img,#listas.lista .item .ph{width:64px;height:64px;align-self:flex-start}
+  }
+  .precio{font-weight:700;color:var(--head)}
+  .precio s{color:var(--muted);font-weight:400;font-size:13px;margin-right:6px}
+  .precio .promo{color:var(--gold2)}
+
+  .cant{display:inline-flex;align-items:center;border:1px solid rgba(255,255,255,.18);border-radius:10px;overflow:hidden}
+  .cant button{width:36px;height:36px;border:0;background:transparent;color:var(--head);font-size:19px;cursor:pointer}
+  .cant button:hover{background:rgba(255,255,255,.07)}
+  .cant input{width:44px;height:36px;border:0;border-radius:0;text-align:center;padding:0;background:transparent;-moz-appearance:textfield}
+  .cant input::-webkit-outer-spin-button,.cant input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+  .agregar{border:0;border-radius:10px;padding:8px 14px;background:var(--gold);color:#141416;font-weight:700;cursor:pointer}
+  .agregar:hover{background:var(--gold2)}
+
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:0;border-radius:11px;padding:12px 16px;font-weight:700;font-size:15px;cursor:pointer;background:var(--gold);color:#141416;text-decoration:none}
+  .btn:hover{background:var(--gold2)}
+  .btn.sec{background:transparent;color:var(--head);border:1px solid rgba(255,255,255,.2)}
+  .btn.wa{background:#25D366;color:#0b2914}.btn.wa:hover{background:#3ee07c}
+  .btn[disabled]{opacity:.5;cursor:not-allowed}
+
+  .carrito{position:fixed;left:0;right:0;bottom:0;z-index:6;background:#0f0f11;border-top:1px solid rgba(212,166,74,.4);padding:12px 16px;display:flex;align-items:center;gap:14px;justify-content:center}
+  .carrito .res{color:var(--head);font-size:15px}
+  .carrito .res b{color:var(--gold2)}
+
+  .fondo{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:10;display:flex;justify-content:flex-end}
+  .panel{background:var(--card);width:min(560px,100%);height:100%;overflow-y:auto;padding:20px 20px 30px;border-left:1px solid var(--line)}
+  .panel h2{margin:0 0 4px;font:700 22px 'Playfair Display',Georgia,serif;color:var(--head)}
+  .cerrar{float:right;background:transparent;border:0;color:var(--muted);font-size:26px;cursor:pointer;line-height:1}
+  .tipo{display:flex;gap:8px;margin:14px 0}
+  .tipo label{flex:1;border:1px solid rgba(255,255,255,.16);border-radius:11px;padding:10px;cursor:pointer;text-align:center;font-weight:600;color:var(--head)}
+  .tipo input{display:none}
+  .tipo label:has(input:checked){border-color:var(--gold);background:rgba(212,166,74,.12)}
+  .fila{display:grid;grid-template-columns:1fr auto auto auto;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)}
+  .fila .n{color:var(--head);font-weight:600;font-size:14.5px}
+  .fila .u{font-size:12.5px;color:var(--muted)}
+  .fila .sub{min-width:86px;text-align:right;font-weight:700;color:var(--head)}
+  .quitar{background:transparent;border:0;color:var(--err);cursor:pointer;font-size:18px}
+  .totales{margin:14px 0;font-size:15px}
+  .totales div{display:flex;justify-content:space-between;padding:3px 0}
+  .totales .tot{font-size:19px;font-weight:700;color:var(--gold2);border-top:1px solid var(--line);padding-top:8px;margin-top:6px}
+  .nota{font-size:12.5px;color:var(--muted)}
+  label.c{display:block;font-size:13px;font-weight:600;color:var(--muted);margin:12px 0 5px}
+  .acciones{display:flex;flex-wrap:wrap;gap:10px;margin-top:16px}
+  .msg{font-size:14px;margin-top:10px;min-height:1.2em}
+  .msg.err{color:var(--err)}.msg.ok{color:var(--ok)}
+  .vacio{color:var(--muted);text-align:center;padding:40px 10px}
+
+  /* Hoja para imprimir / guardar PDF */
+  #hoja{display:none}
+  @media print{
+    body{background:#fff;color:#222}
+    body>*:not(#hoja){display:none!important}
+    #hoja{display:block;font:13px/1.45 Inter,Arial,sans-serif;color:#222;padding:10px}
+    #hoja h1{font:700 22px Georgia,serif;margin:0}
+    #hoja table{width:100%;border-collapse:collapse;margin-top:14px}
+    #hoja th,#hoja td{border-bottom:1px solid #ddd;padding:7px 6px;text-align:left}
+    #hoja td.r,#hoja th.r{text-align:right}
+    #hoja .tot td{font-weight:700;font-size:15px;border-top:2px solid #222}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div id="cargando" class="vacio">Cargando catálogo…</div>
+  <div id="cerrado" class="vacio" hidden>Este catálogo no está disponible en este momento.</div>
+
+  <div id="app" hidden>
+    <div class="marca" id="marca"></div>
+    <div class="contacto" id="contacto"></div>
+    <div class="compartir" id="compartir" hidden>
+      <b>Este es el enlace de tu catálogo</b> para mandarle a tus clientas (solo lo ves vos, porque tenés la sesión abierta).
+      <div class="fila-link">
+        <input id="linkPropio" readonly aria-label="Enlace de tu catálogo" onclick="this.select()">
+        <button class="btn sec" type="button" id="btnCopiarLink">Copiar</button>
+        <a class="btn wa" id="btnCompartirWa" target="_blank" rel="noopener">WhatsApp</a>
+        <button class="btn sec" type="button" id="btnCompartirNat" hidden>Compartir…</button>
+      </div>
+    </div>
+    <div class="aviso">Elegí los servicios, combos o productos que quieras y la cantidad de cada uno. Después tocá <b>Ver mi pedido</b> para mandarlo como <b>pedido</b> o pedir un <b>presupuesto</b> por WhatsApp.</div>
+
+    <div class="barra">
+      <div class="tabs" id="tabs"></div>
+      <input class="buscar" id="buscar" type="search" placeholder="Buscar…">
+      <div class="vistas" role="group" aria-label="Cómo ver los productos">
+        <button type="button" class="vista" data-vista="grande" aria-pressed="true" title="Iconos grandes">▦ Iconos</button>
+        <button type="button" class="vista" data-vista="lista" aria-pressed="false" title="Lista">☰ Lista</button>
+      </div>
+    </div>
+    <div class="promos" id="promos"></div>
+
+    <div id="listas"></div>
+  </div>
+</div>
+
+<div class="carrito" id="barraCarrito" hidden>
+  <span class="res" id="resumen"></span>
+  <button class="btn" type="button" id="btnVer">Ver mi pedido</button>
+</div>
+
+<div class="fondo" id="fondo" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="tituloPanel">
+    <button class="cerrar" type="button" id="btnCerrar" aria-label="Cerrar">×</button>
+    <h2 id="tituloPanel">Mi pedido</h2>
+    <div class="nota" id="fechaPanel"></div>
+
+    <div class="tipo">
+      <label><input type="radio" name="tipo" value="pedido" checked> Hacer pedido</label>
+      <label><input type="radio" name="tipo" value="presupuesto"> Pedir presupuesto</label>
+    </div>
+
+    <div id="filas"></div>
+    <div class="totales" id="totales"></div>
+
+    <label class="c" for="fNombre">Tu nombre *</label>
+    <input id="fNombre" maxlength="80" autocomplete="name" placeholder="Ej: Laura Gómez">
+    <label class="c" for="fNota">Comentarios (opcional)</label>
+    <textarea id="fNota" maxlength="400" placeholder="Ej: días y horarios que te quedan bien, forma de pago, retiro o envío…"></textarea>
+
+    <div class="acciones">
+      <button class="btn wa" type="button" id="btnEnviar">Enviar por WhatsApp</button>
+      <button class="btn sec" type="button" id="btnImprimir">Imprimir / PDF</button>
+      <button class="btn sec" type="button" id="btnVaciar">Vaciar</button>
+    </div>
+    <div class="msg" id="msg"></div>
+  </div>
+</div>
+
+<div id="hoja"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+(function(){
+"use strict";
+var SB_URL = "https://qmjrndimibjoxrigvmgt.supabase.co";
+var SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFtanJuZGltaWJqb3hyaWd2bWd0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTUyODY1MTQsImV4cCI6MjExMDg2MjUxNH0.HNS36EbHA7FO84XTXsr6JN9CElkwoep8CbBd8wDm84c";
+var CLAVE_SESION = "sb-qmjrndimibjoxrigvmgt-auth-token";
+
+function $(id){ return document.getElementById(id); }
+function el(tag, cls, txt){ var e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; }
+function pesos(n){ return "$ " + Number(n).toLocaleString("es-AR", {maximumFractionDigits:0}); }
+function msg(tipo, t){ $("msg").className = "msg " + (tipo||""); $("msg").textContent = t || ""; }
+function telWa(t){
+  var d = String(t||"").replace(/\D/g,"");
+  if (!d) return "";
+  if (d.indexOf("00")===0) d = d.slice(2);
+  if (d.indexOf("54")===0) return d;
+  if (d.charAt(0)==="0") d = d.slice(1);
+  if (d.length===10) return "549"+d;
+  return d;
+}
+function hoy(){ var d = new Date(); return ("0"+d.getDate()).slice(-2)+"/"+("0"+(d.getMonth()+1)).slice(-2)+"/"+d.getFullYear(); }
+
+/* Si quien abre el enlace es el propio centro (sesión abierta en la app), se ve su catálogo.
+   Si no, el catálogo público. Sesión vencida o rara → como visitante. */
+function tokenSesion(){
+  try {
+    var s = JSON.parse(localStorage.getItem(CLAVE_SESION) || "null");
+    if (typeof s === "string") s = JSON.parse(s);
+    if (s && s.currentSession) s = s.currentSession;
+    if (!s || !s.access_token) return null;
+    var pl = JSON.parse(atob(s.access_token.split(".")[1].replace(/-/g,"+").replace(/_/g,"/")));
+    return pl.exp * 1000 > Date.now() + 60000 ? s.access_token : null;
+  } catch (e) { return null; }
+}
+function cliente(token){
+  var op = { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } };
+  if (token) op.global = { headers: { Authorization: "Bearer " + token } };
+  return supabase.createClient(SB_URL, SB_KEY, op);
+}
+
+var cat = null;          // respuesta de public_catalog
+var items = {};          // clave → ítem del catálogo
+var carrito = {};        // clave → cantidad
+var claveCarrito = "gc-catalogo-carrito";
+var filtro = "todo";
+
+var BASE_ENLACE = "https://agenda.grupocapybara.online/catalogo";
+function idDelEnlace(){
+  var c = new URLSearchParams(location.search).get("c") || "";
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(c) ? c : null;
+}
+
+async function arrancar(){
+  // Con ?c=<centro> se muestra ese centro. Sin ?c (enlaces viejos): el propio centro si hay sesión,
+  // y si no, el catálogo público por defecto.
+  var cid = idDelEnlace(), tk = tokenSesion(), propio = false, r;
+  if (cid) r = await cliente(null).rpc("public_catalog", { p_center: cid });
+  else {
+    r = await cliente(tk).rpc("public_catalog");
+    propio = !!tk && !r.error;
+    if (r.error && tk) r = await cliente(null).rpc("public_catalog");
+  }
+  $("cargando").hidden = true;
+  if (r.error || !r.data || !r.data.enabled) { $("cerrado").hidden = false; console.error(r.error); return; }
+  cat = r.data;
+  if (!cid && cat.center.id) {
+    // Deja en la barra de direcciones el enlace con el centro, para que se copie bien.
+    try { history.replaceState(null, "", location.pathname + "?c=" + cat.center.id); } catch (e) {}
+  }
+  if (propio && cat.center.id) pintarCompartir(BASE_ENLACE + "?c=" + cat.center.id);
+  armarItems();
+  claveCarrito += "-" + (cat.center.id || (cat.center.name || "").toLowerCase().replace(/[^a-z0-9]+/g, "-"));
+  try { carrito = JSON.parse(localStorage.getItem(claveCarrito) || "{}") || {}; } catch (e) { carrito = {}; }
+  Object.keys(carrito).forEach(function(k){ if (!items[k] || !(carrito[k] > 0)) delete carrito[k]; });
+  try { $("fNombre").value = localStorage.getItem("gc-catalogo-nombre") || ""; } catch (e) {}
+  pintarMarca(); pintarPromos(); pintarTabs(); pintarListas(); actualizarCarrito();
+  $("app").hidden = false;
+}
+
+function precioDe(x){
+  var p = Number(x.price) || 0, pr = x.promo_price != null ? Number(x.promo_price) : null;
+  return { lista: p, final: (pr != null && pr > 0 && pr < p) ? pr : p, promo: pr != null && pr > 0 && pr < p };
+}
+function armarItems(){
+  (cat.services||[]).forEach(function(s){ items["s:"+s.id] = { clave:"s:"+s.id, tipo:"Servicios", nombre:s.name, desc:s.description, cat:s.category,
+    extra: s.duration_minutes ? s.duration_minutes + " min" : "", img:s.image_url, precio:precioDe(s) }; });
+  (cat.combos||[]).forEach(function(c){ items["c:"+c.id] = { clave:"c:"+c.id, tipo:"Combos", nombre:c.name, desc:c.description || "",
+    extra: (c.services||[]).join(" + "), img:null, precio:precioDe(c) }; });
+  (cat.products||[]).forEach(function(p){ items["p:"+p.id] = { clave:"p:"+p.id, tipo:"Productos", nombre:p.name, desc:p.description, cat:[p.category, p.brand].filter(Boolean).join(" · "),
+    extra:"", img:p.image_url, precio:precioDe(p) }; });
+}
+
+function pintarMarca(){
+  var c = cat.center, m = $("marca");
+  document.title = "Catálogo · " + (c.name || "");
+  if (c.logo_url) { var im = el("img"); im.src = c.logo_url; im.alt = ""; m.appendChild(im); }
+  else m.appendChild(el("div", "ini", (c.name || "?").charAt(0).toUpperCase()));
+  var t = el("div"); t.appendChild(el("h1", null, c.name || "")); if (c.description) t.appendChild(el("p", null, c.description)); m.appendChild(t);
+  var k = $("contacto");
+  if (c.address) k.appendChild(el("span", null, "📍 " + c.address));
+  if (c.instagram) { var ig = String(c.instagram).replace(/^@/,"").replace(/^https?:\/\/(www\.)?instagram\.com\//,"").replace(/\/$/,"");
+    var a = el("a", null, "@" + ig); a.href = "https://instagram.com/" + ig; a.target = "_blank"; a.rel = "noopener"; k.appendChild(a); }
+  if (c.website) { var w = el("a", null, String(c.website).replace(/^https?:\/\//,"")); w.href = /^https?:/.test(c.website) ? c.website : "https://" + c.website; w.target = "_blank"; w.rel = "noopener"; k.appendChild(w); }
+}
+
+/* Solo lo ve el propio centro (sesión abierta): el enlace correcto para mandar a sus clientas. */
+function pintarCompartir(link){
+  var b = $("compartir"); b.hidden = false;
+  $("linkPropio").value = link;
+  var texto = "Conocé nuestros servicios y promociones 🌿 Armá tu pedido o pedí presupuesto acá: " + link;
+  $("btnCompartirWa").href = "https://wa.me/?text=" + encodeURIComponent(texto);
+  $("btnCopiarLink").addEventListener("click", async function(){
+    try { await navigator.clipboard.writeText(link); this.textContent = "¡Copiado!"; }
+    catch (e) { $("linkPropio").select(); document.execCommand("copy"); this.textContent = "¡Copiado!"; }
+  });
+  if (navigator.share) {
+    $("btnCompartirNat").hidden = false;
+    $("btnCompartirNat").addEventListener("click", function(){ navigator.share({ text: texto }).catch(function(){}); });
+  }
+}
+
+function pintarPromos(){
+  var cont = $("promos");
+  (cat.posts||[]).forEach(function(p){
+    var d = el("div", "promo");
+    if (p.image_url) { var im = el("img"); im.src = p.image_url; im.alt = ""; im.loading = "lazy"; d.appendChild(im); }
+    var inn = el("div", "in"); inn.appendChild(el("b", null, p.title)); if (p.body) inn.appendChild(el("span", null, p.body));
+    var k = p.service_id ? "s:"+p.service_id : p.combo_id ? "c:"+p.combo_id : p.product_id ? "p:"+p.product_id : null;
+    if (k && items[k]) {
+      var b = el("button", "agregar", p.cta_label || "Agregar al pedido"); b.type = "button"; b.style.alignSelf = "flex-start"; b.style.marginTop = "6px";
+      b.addEventListener("click", function(){ cambiar(k, (carrito[k]||0) + 1); });
+      inn.appendChild(b);
+    }
+    d.appendChild(inn); cont.appendChild(d);
+  });
+  cont.hidden = !(cat.posts||[]).length;
+}
+
+function pintarTabs(){
+  var tipos = ["Servicios","Combos","Productos"].filter(function(t){ return Object.keys(items).some(function(k){ return items[k].tipo === t; }); });
+  var t = $("tabs");
+  ["todo"].concat(tipos).forEach(function(x){
+    var b = el("button", "tab" + (x === filtro ? " on" : ""), x === "todo" ? "Todo" : x); b.type = "button";
+    b.addEventListener("click", function(){ filtro = x; Array.prototype.forEach.call(t.children, function(y){ y.classList.toggle("on", y === b); }); pintarListas(); });
+    t.appendChild(b);
+  });
+  if (tipos.length < 2) t.hidden = true;
+}
+
+function normal(s){ return String(s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,""); }
+function pintarListas(){
+  var cont = $("listas"), q = normal($("buscar").value.trim()); cont.innerHTML = "";
+  var hay = false;
+  ["Servicios","Combos","Productos"].forEach(function(tipo){
+    if (filtro !== "todo" && filtro !== tipo) return;
+    var lista = Object.keys(items).map(function(k){ return items[k]; }).filter(function(x){
+      return x.tipo === tipo && (!q || normal([x.nombre, x.desc, x.cat, x.extra].join(" ")).indexOf(q) >= 0);
+    });
+    if (!lista.length) return;
+    hay = true;
+    cont.appendChild(el("div", "grupo", tipo));
+    var g = el("div", "lista"); lista.forEach(function(x){ g.appendChild(tarjeta(x)); }); cont.appendChild(g);
+  });
+  if (!hay) cont.appendChild(el("div", "vacio", q ? "No encontramos nada con esa búsqueda." : "Todavía no hay nada cargado en el catálogo."));
+}
+
+function textoPrecio(x){
+  var s = el("div", "precio");
+  if (!x.precio.final) { s.textContent = "Consultar"; return s; }
+  if (x.precio.promo) { s.appendChild(el("s", null, pesos(x.precio.lista))); s.appendChild(el("span", "promo", pesos(x.precio.final))); }
+  else s.textContent = pesos(x.precio.final);
+  return s;
+}
+function tarjeta(x){
+  var d = el("div", "item" + (carrito[x.clave] ? " sel" : "")); d.setAttribute("data-k", x.clave);
+  if (x.img) { var im = el("img"); im.src = x.img; im.alt = ""; im.loading = "lazy"; d.appendChild(im); }
+  else d.appendChild(el("div", "ph", x.tipo === "Productos" ? "📦" : x.tipo === "Combos" ? "✨" : "🌿"));  // solo se ve en lista
+  var inn = el("div", "in"), txt = el("div", "txt");
+  if (x.cat) txt.appendChild(el("div", "cat", x.cat));
+  txt.appendChild(el("h3", null, x.nombre));
+  if (x.desc) txt.appendChild(el("div", "desc", x.desc));
+  if (x.extra) txt.appendChild(el("div", "desc", x.extra));
+  inn.appendChild(txt);
+  var pie = el("div", "pie"); pie.appendChild(textoPrecio(x)); pie.appendChild(control(x.clave));
+  inn.appendChild(pie); d.appendChild(inn);
+  return d;
+}
+function control(k){
+  var n = carrito[k] || 0;
+  if (!n) {
+    var b = el("button", "agregar", "Agregar"); b.type = "button";
+    b.addEventListener("click", function(){ cambiar(k, 1); });
+    return b;
+  }
+  var c = el("div", "cant");
+  var menos = el("button", null, "−"); menos.type = "button"; menos.setAttribute("aria-label", "Uno menos");
+  var inp = el("input"); inp.type = "number"; inp.min = "0"; inp.max = "999"; inp.value = n; inp.setAttribute("aria-label", "Cantidad");
+  var mas = el("button", null, "+"); mas.type = "button"; mas.setAttribute("aria-label", "Uno más");
+  menos.addEventListener("click", function(){ cambiar(k, (carrito[k]||0) - 1); });
+  mas.addEventListener("click", function(){ cambiar(k, (carrito[k]||0) + 1); });
+  inp.addEventListener("change", function(){ cambiar(k, parseInt(inp.value, 10) || 0); });
+  c.appendChild(menos); c.appendChild(inp); c.appendChild(mas);
+  return c;
+}
+
+function cambiar(k, n){
+  n = Math.max(0, Math.min(999, n|0));
+  if (n) carrito[k] = n; else delete carrito[k];
+  try { localStorage.setItem(claveCarrito, JSON.stringify(carrito)); } catch (e) {}
+  // Se reemplaza solo la tarjeta tocada para no perder el lugar en la página.
+  Array.prototype.forEach.call(document.querySelectorAll('.item[data-k="' + k + '"]'), function(d){ d.replaceWith(tarjeta(items[k])); });
+  actualizarCarrito();
+  if (!$("fondo").hidden) pintarPanel();
+}
+
+function calcular(){
+  var filas = Object.keys(carrito).map(function(k){ var x = items[k], n = carrito[k]; return { x:x, n:n, sub: x.precio.final * n }; });
+  var total = 0, consultar = 0, unidades = 0, ahorro = 0;
+  filas.forEach(function(f){ unidades += f.n; if (f.x.precio.final) { total += f.sub; if (f.x.precio.promo) ahorro += (f.x.precio.lista - f.x.precio.final) * f.n; } else consultar++; });
+  return { filas:filas, total:total, consultar:consultar, unidades:unidades, ahorro:ahorro };
+}
+function actualizarCarrito(){
+  var c = calcular();
+  $("barraCarrito").hidden = !c.filas.length;
+  $("resumen").innerHTML = "";
+  $("resumen").appendChild(document.createTextNode(c.unidades + (c.unidades === 1 ? " ítem · " : " ítems · ")));
+  $("resumen").appendChild(el("b", null, pesos(c.total) + (c.consultar ? " + a consultar" : "")));
+}
+
+function tipoSel(){ return document.querySelector('input[name="tipo"]:checked').value; }
+function pintarPanel(){
+  var c = calcular(), f = $("filas"); f.innerHTML = "";
+  $("tituloPanel").textContent = tipoSel() === "presupuesto" ? "Mi presupuesto" : "Mi pedido";
+  $("fechaPanel").textContent = (cat.center.name || "") + " · " + hoy();
+  if (!c.filas.length) { f.appendChild(el("div", "vacio", "No elegiste nada todavía.")); $("totales").innerHTML = ""; return; }
+  c.filas.forEach(function(r){
+    var d = el("div", "fila"), a = el("div");
+    a.appendChild(el("div", "n", r.x.nombre));
+    a.appendChild(el("div", "u", r.x.tipo.replace(/s$/,"") + " · " + (r.x.precio.final ? pesos(r.x.precio.final) + " c/u" : "precio a consultar")));
+    d.appendChild(a); d.appendChild(control(r.x.clave));
+    d.appendChild(el("div", "sub", r.x.precio.final ? pesos(r.sub) : "—"));
+    var q = el("button", "quitar", "🗑"); q.type = "button"; q.setAttribute("aria-label", "Quitar " + r.x.nombre);
+    q.addEventListener("click", function(){ cambiar(r.x.clave, 0); }); d.appendChild(q);
+    f.appendChild(d);
+  });
+  var t = $("totales"); t.innerHTML = "";
+  function linea(a, b, cls){ var d = el("div", cls); d.appendChild(el("span", null, a)); d.appendChild(el("span", null, b)); t.appendChild(d); }
+  if (c.ahorro > 0) linea("Ahorro por promos", "− " + pesos(c.ahorro));
+  linea("Total estimado", pesos(c.total), "tot");
+  if (c.consultar) t.appendChild(el("div", "nota", c.consultar + (c.consultar === 1 ? " ítem tiene" : " ítems tienen") + " precio a consultar y no está sumado."));
+  t.appendChild(el("div", "nota", "Los precios son de referencia; el centro te confirma el total y la disponibilidad."));
+}
+
+function textoPedido(){
+  var c = calcular(), tipo = tipoSel(), nombre = $("fNombre").value.trim(), nota = $("fNota").value.trim();
+  var L = [];
+  L.push("¡Hola " + (cat.center.name || "") + "! Soy " + nombre + ".");
+  L.push(tipo === "presupuesto" ? "Quisiera un *presupuesto* por:" : "Quiero hacer este *pedido*:");
+  L.push("");
+  c.filas.forEach(function(r){
+    L.push("• " + r.n + " × " + r.x.nombre + (r.x.precio.final ? " — " + pesos(r.x.precio.final) + " c/u = " + pesos(r.sub) : " — precio a consultar"));
+  });
+  L.push("");
+  L.push("*Total estimado: " + pesos(c.total) + "*" + (c.consultar ? " (+ ítems a consultar)" : ""));
+  if (nota) { L.push(""); L.push("Comentarios: " + nota); }
+  L.push(""); L.push("(Armado desde el catálogo · " + hoy() + ")");
+  return L.join("\n");
+}
+function validar(){
+  if (!calcular().filas.length) { msg("err", "Elegí al menos un ítem."); return false; }
+  if (!$("fNombre").value.trim()) { msg("err", "Escribí tu nombre para que el centro sepa quién lo pide."); $("fNombre").focus(); return false; }
+  try { localStorage.setItem("gc-catalogo-nombre", $("fNombre").value.trim()); } catch (e) {}
+  return true;
+}
+
+$("buscar").addEventListener("input", pintarListas);
+
+/* Vista: iconos grandes o lista. Se recuerda en el navegador de quien mira. */
+function ponerVista(v){
+  if (v !== "lista") v = "grande";
+  $("listas").className = v;
+  Array.prototype.forEach.call(document.querySelectorAll(".vista"), function(b){ b.setAttribute("aria-pressed", String(b.getAttribute("data-vista") === v)); });
+  try { localStorage.setItem("gc-catalogo-vista", v); } catch (e) {}
+}
+Array.prototype.forEach.call(document.querySelectorAll(".vista"), function(b){
+  b.addEventListener("click", function(){ ponerVista(b.getAttribute("data-vista")); });
+});
+try { ponerVista(localStorage.getItem("gc-catalogo-vista")); } catch (e) { ponerVista("grande"); }
+$("btnVer").addEventListener("click", function(){ msg(); pintarPanel(); $("fondo").hidden = false; document.body.style.overflow = "hidden"; });
+function cerrar(){ $("fondo").hidden = true; document.body.style.overflow = ""; }
+$("btnCerrar").addEventListener("click", cerrar);
+$("fondo").addEventListener("click", function(ev){ if (ev.target === this) cerrar(); });
+document.addEventListener("keydown", function(ev){ if (ev.key === "Escape" && !$("fondo").hidden) cerrar(); });
+Array.prototype.forEach.call(document.querySelectorAll('input[name="tipo"]'), function(r){ r.addEventListener("change", pintarPanel); });
+
+$("btnEnviar").addEventListener("click", function(){
+  if (!validar()) return;
+  var tel = telWa(cat.center.whatsapp || cat.center.phone);
+  var url = (tel ? "https://wa.me/" + tel : "https://wa.me/") + "?text=" + encodeURIComponent(textoPedido());
+  window.open(url, "_blank", "noopener");
+  msg("ok", tel ? "Se abrió WhatsApp con tu " + tipoSel() + ". Solo falta tocar enviar." : "Se abrió WhatsApp: elegí el chat del centro y enviá el mensaje.");
+});
+$("btnImprimir").addEventListener("click", function(){
+  if (!validar()) return;
+  var c = calcular(), h = $("hoja"); h.innerHTML = "";
+  h.appendChild(el("h1", null, cat.center.name || ""));
+  h.appendChild(el("div", null, (tipoSel() === "presupuesto" ? "Presupuesto" : "Pedido") + " · " + hoy() + " · " + $("fNombre").value.trim()));
+  var tb = el("table"), th = el("tr");
+  [["Cant.",""],["Detalle",""],["Precio unit.","r"],["Subtotal","r"]].forEach(function(x){ th.appendChild(el("th", x[1], x[0])); });
+  tb.appendChild(th);
+  c.filas.forEach(function(r){
+    var tr = el("tr");
+    tr.appendChild(el("td", null, String(r.n))); tr.appendChild(el("td", null, r.x.nombre));
+    tr.appendChild(el("td", "r", r.x.precio.final ? pesos(r.x.precio.final) : "A consultar"));
+    tr.appendChild(el("td", "r", r.x.precio.final ? pesos(r.sub) : "—"));
+    tb.appendChild(tr);
+  });
+  var tt = el("tr", "tot"); tt.appendChild(el("td")); tt.appendChild(el("td", null, "Total estimado")); tt.appendChild(el("td"));
+  tt.appendChild(el("td", "r", pesos(c.total))); tb.appendChild(tt);
+  h.appendChild(tb);
+  if ($("fNota").value.trim()) h.appendChild(el("p", null, "Comentarios: " + $("fNota").value.trim()));
+  h.appendChild(el("p", null, "Precios de referencia, sujetos a confirmación del centro."));
+  window.print();
+});
+$("btnVaciar").addEventListener("click", function(){
+  if (!confirm("¿Vaciar todo lo que elegiste?")) return;
+  carrito = {}; try { localStorage.removeItem(claveCarrito); } catch (e) {}
+  pintarListas(); actualizarCarrito(); pintarPanel(); msg();
+});
+
+arrancar().catch(function(e){ console.error(e); $("cargando").hidden = true; $("cerrado").hidden = false; });
+})();
+</script>
+</body>
+</html>

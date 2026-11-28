@@ -1,0 +1,36 @@
+{
+    "name": "Agenda Wellness · Grupo Capybara",
+    "short_name": "Agenda Wellness",
+    "start_url": ".",
+    "display": "standalone",
+    "background_color": "#141416",
+    "theme_color": "#141416",
+    "description": "Turnos, clientes, fichas, pagos y catálogo para centros de estética. Incluida en el Plan Gestión de Grupo Capybara.",
+    "orientation": "portrait-primary",
+    "prefer_related_applications": false,
+    "icons": [
+        {
+            "src": "icons/Icon-192.png",
+            "sizes": "192x192",
+            "type": "image/png"
+        },
+        {
+            "src": "icons/Icon-512.png",
+            "sizes": "512x512",
+            "type": "image/png"
+        },
+        {
+            "src": "icons/Icon-maskable-192.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "maskable"
+        },
+        {
+            "src": "icons/Icon-maskable-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "maskable"
+        }
+    ],
+    "lang": "es"
+}

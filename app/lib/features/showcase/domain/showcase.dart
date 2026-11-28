@@ -15,10 +15,15 @@ class Product {
     this.isActive = true,
     this.isFeatured = false,
     this.sortOrder = 0,
+    this.code,
   });
 
   final String? id;
   final String name;
+
+  /// Código propio del producto (carga masiva por Excel, migración 11). Solo se muestra:
+  /// no va en [toRow], así editar el producto desde la app no lo borra.
+  final String? code;
   final String? description;
   final String? category;
   final String? brand;
@@ -46,6 +51,7 @@ class Product {
         isActive: j['is_active'] as bool? ?? true,
         isFeatured: j['is_featured'] as bool? ?? false,
         sortOrder: (j['sort_order'] as num?)?.toInt() ?? 0,
+        code: j['code'] as String?,
       );
 
   Map<String, dynamic> toRow() => {

@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#141416">
+<title>Google Calendar · Agenda Wellness</title>
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<!--
+  GRUPO CAPYBARA · Agenda Wellness · Ver la agenda en Google Calendar (28/11/2026)
+  Se publica junto con la app: agenda.grupocapybara.online/calendario.html
+  - Muestra el enlace privado de suscripción del centro y de cada profesional (función SQL
+    agenda_calendario_enlace, migración 12). El enlace lo sirve la Edge Function agenda-calendario.
+  - Admin y recepción ven todos; cada profesional, solo el suyo.
+  - Va en un solo sentido (agenda → Google) y Google lo actualiza cada algunas horas.
+-->
+<style>
+  :root{--bg:#141416;--card:#1C1E22;--line:rgba(255,255,255,.09);--txt:#EAE2D2;--head:#F3EFE7;--muted:#A1A9B1;--gold:#D4A64A;--gold2:#E0B865;--ok:#7BC59A;--err:#E8907E}
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--txt);font:15px/1.5 Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  a{color:var(--gold2)}
+  [hidden]{display:none!important}
+  header{display:flex;align-items:center;gap:12px;padding:14px 20px;border-bottom:1px solid var(--line);position:sticky;top:0;background:rgba(20,20,22,.96);z-index:5}
+  header h1{font-size:18px;margin:0;color:var(--head);font-weight:700}
+  header .sp{flex:1}
+  header .centro{color:var(--muted);font-size:13px}
+  .wrap{max-width:820px;margin:0 auto;padding:22px 18px 60px}
+  .box{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:20px;margin-bottom:18px}
+  .box h2{font-size:17px;margin:0 0 6px;color:var(--head)}
+  .sub{margin:0;color:var(--muted);font-size:14px}
+  label{display:block;font-size:13px;font-weight:600;color:var(--muted);margin:12px 0 5px}
+  input{width:100%;background:#141416;color:var(--head);border:1px solid rgba(255,255,255,.14);border-radius:10px;padding:9px 12px;font:inherit;font-size:14.5px}
+  input:focus{outline:none;border-color:var(--gold)}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:0;border-radius:11px;padding:10px 16px;font:600 14.5px Inter,system-ui,sans-serif;cursor:pointer;background:var(--gold);color:#141416;text-decoration:none;white-space:nowrap}
+  .btn:hover{background:var(--gold2)}
+  .btn.sec{background:transparent;color:var(--head);border:1px solid rgba(255,255,255,.18)}
+  .btn.sec:hover{border-color:var(--gold)}
+  .btn.sm{padding:6px 11px;font-size:13px;border-radius:9px}
+  .btn.peligro{color:var(--err)}
+  .btn[disabled]{opacity:.5;cursor:not-allowed}
+  .acciones{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+  .msg{font-size:14px;margin-top:10px;min-height:1.2em}
+  .msg.ok{color:var(--ok)}.msg.err{color:var(--err)}
+  .cal{border-top:1px solid var(--line);padding:14px 0}
+  .cal:first-of-type{border-top:0}
+  .cal .tit{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+  .cal b{color:var(--head)}
+  .cal .rol{color:var(--muted);font-size:13px}
+  .enlace{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+  .enlace input{flex:1;min-width:220px;font-family:ui-monospace,Consolas,monospace;font-size:12.5px}
+  ol{margin:8px 0 0;padding-left:20px;color:var(--txt);font-size:14.5px}
+  ol li{margin:4px 0}
+  .nota{font-size:13px;color:var(--muted);margin-top:10px}
+  #login{max-width:420px;margin:60px auto}
+</style>
+</head>
+<body>
+<header>
+  <a class="btn sec sm" href="/">← Volver a la agenda</a>
+  <h1>📅 Google Calendar</h1>
+  <span class="sp"></span>
+  <span class="centro" id="nombreCentro"></span>
+</header>
+
+<div id="login" class="box" hidden>
+  <h2>Entrá con tu cuenta de la agenda</h2>
+  <form id="formLogin">
+    <label for="lgEmail">Correo</label>
+    <input id="lgEmail" type="email" autocomplete="username" required>
+    <label for="lgPass">Contraseña</label>
+    <input id="lgPass" type="password" autocomplete="current-password" required>
+    <div class="acciones"><button class="btn" type="submit">Entrar</button></div>
+    <div class="msg" id="lgMsg"></div>
+  </form>
+</div>
+
+<div class="wrap" id="app" hidden>
+  <div class="box">
+    <h2>Cómo funciona</h2>
+    <p class="sub">Cada enlace es un calendario privado con los turnos de la agenda. Se agrega una sola vez en Google Calendar y después los turnos aparecen solos, en el celular y en la compu.</p>
+    <ol>
+      <li>Tocá <b>Agregar a Google Calendar</b> (con la cuenta de Gmail donde lo quieras ver) y confirmá.</li>
+      <li>O copiá el enlace y en Google Calendar andá a <b>Otros calendarios → + → Desde URL</b>, pegalo y tocá <b>Agregar calendario</b>.</li>
+    </ol>
+    <p class="nota">⏱ Es en un solo sentido: los turnos se cargan en la agenda y Google los copia. Google revisa el enlace cada algunas horas, así que un turno nuevo puede tardar en aparecer. Se ven los últimos 3 meses y los próximos 12; los cancelados no aparecen.<br>🔒 Quien tenga el enlace ve los turnos (con nombre y WhatsApp de la clienta). No lo compartas; si se filtró, tocá <b>Cambiar enlace</b> y el anterior deja de funcionar.</p>
+  </div>
+
+  <div class="box">
+    <h2>Tus calendarios</h2>
+    <div id="lista"></div>
+    <div class="msg" id="msg"></div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+(function(){
+"use strict";
+var SB_URL = "https://qmjrndimibjoxrigvmgt.supabase.co";
+var SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFtanJuZGltaWJqb3hyaWd2bWd0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTUyODY1MTQsImV4cCI6MjExMDg2MjUxNH0.HNS36EbHA7FO84XTXsr6JN9CElkwoep8CbBd8wDm84c";
+var CLAVE_SESION = "sb-qmjrndimibjoxrigvmgt-auth-token";
+var FUNCION = SB_URL + "/functions/v1/agenda-calendario?t=";
+
+function $(id){ return document.getElementById(id); }
+function el(tag, cls, txt){ var e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; }
+function msg(id, tipo, t){ $(id).className = "msg " + (tipo||""); $(id).textContent = t || ""; }
+
+/* La app Flutter guarda la sesión sin "expires_at": se calcula desde el token (igual que las otras páginas). */
+(function prepararSesion(){
+  try {
+    var crudo = localStorage.getItem(CLAVE_SESION); if (!crudo) return;
+    var s = JSON.parse(crudo); if (typeof s === "string") s = JSON.parse(s);
+    if (s && s.currentSession) s = s.currentSession;
+    if (!s || !s.access_token) return;
+    if (!s.expires_at) { var pl = JSON.parse(atob(s.access_token.split(".")[1].replace(/-/g,"+").replace(/_/g,"/"))); s.expires_at = pl.exp; }
+    localStorage.setItem(CLAVE_SESION, JSON.stringify(s));
+  } catch (e) {}
+})();
+var sb = supabase.createClient(SB_URL, SB_KEY, { auth: { storageKey: CLAVE_SESION, persistSession: true, autoRefreshToken: true, detectSessionInUrl: false } });
+
+async function arrancar(){
+  var r = await sb.auth.getSession(), ses = r.data && r.data.session;
+  if (!ses) { $("login").hidden = false; return; }
+  try { await cargar(ses.user); }
+  catch (e) { console.error(e); $("login").hidden = false; $("app").hidden = true; msg("lgMsg", "err", e.message || "No pudimos abrir tu centro. Entrá de nuevo."); }
+}
+$("formLogin").addEventListener("submit", async function(ev){
+  ev.preventDefault(); msg("lgMsg", "", "Entrando…");
+  var r = await sb.auth.signInWithPassword({ email: $("lgEmail").value.trim(), password: $("lgPass").value });
+  if (r.error) return msg("lgMsg", "err", "Correo o contraseña incorrectos.");
+  $("lgPass").value = "";
+  try { await cargar(r.data.user); $("login").hidden = true; }
+  catch (e) { console.error(e); msg("lgMsg", "err", e.message || "No pudimos abrir tu centro."); }
+});
+
+async function cargar(user){
+  var rc = await sb.rpc("current_center_id"), rr = await sb.rpc("agenda_rol");
+  if (rc.error || !rc.data) throw new Error("Tu cuenta todavía no tiene un centro activo en la agenda.");
+  if (!rr.data) throw new Error("Tu usuario no está activo en el centro.");
+  var c = await sb.from("centers").select("id,name").eq("id", rc.data).maybeSingle();
+  $("nombreCentro").textContent = (c.data && c.data.name) || "";
+  var rol = rr.data, items = [];
+  if (rol === "admin" || rol === "receptionist") {
+    items.push({ id: null, nombre: "Todo el centro", detalle: "Todos los turnos, de todos los profesionales" });
+    var eq = await sb.from("profiles").select("id,full_name,role,is_active").eq("center_id", rc.data).eq("is_active", true).order("full_name");
+    (eq.data || []).forEach(function(p){ items.push({ id: p.id, nombre: p.full_name || "Sin nombre", detalle: "Solo los turnos de esta persona" + (p.id === user.id ? " (vos)" : "") }); });
+  } else {
+    var yo = await sb.from("profiles").select("id,full_name").eq("id", user.id).maybeSingle();
+    items.push({ id: user.id, nombre: (yo.data && yo.data.full_name) || "Mi agenda", detalle: "Tus turnos" });
+  }
+  pintar(items);
+  $("app").hidden = false;
+}
+
+function pintar(items){
+  var cont = $("lista"); cont.innerHTML = "";
+  items.forEach(function(it){
+    var d = el("div", "cal"), tit = el("div", "tit"), a = el("div");
+    a.appendChild(el("b", null, it.nombre)); a.appendChild(el("div", "rol", it.detalle));
+    var ver = el("button", "btn sm", "Mostrar enlace"); ver.type = "button";
+    tit.appendChild(a); tit.appendChild(ver); d.appendChild(tit);
+    var zona = el("div"); zona.hidden = true; d.appendChild(zona);
+    ver.addEventListener("click", function(){ mostrar(it, zona, ver, false); });
+    cont.appendChild(d);
+  });
+}
+
+async function mostrar(it, zona, ver, regenerar){
+  ver.disabled = true; msg("msg", "", regenerar ? "Cambiando el enlace…" : "Buscando el enlace…");
+  var r = await sb.rpc("agenda_calendario_enlace", { p_therapist: it.id, p_regenerar: regenerar });
+  ver.disabled = false;
+  if (r.error) { console.error(r.error); return msg("msg", "err", r.error.message || "No pudimos obtener el enlace."); }
+  msg("msg");
+  var url = FUNCION + r.data;
+  zona.innerHTML = ""; zona.hidden = false; ver.hidden = true;
+  var fila = el("div", "enlace"), inp = el("input"); inp.readOnly = true; inp.value = url; inp.setAttribute("aria-label", "Enlace del calendario de " + it.nombre);
+  inp.addEventListener("click", function(){ inp.select(); });
+  var cop = el("button", "btn sec sm", "Copiar"); cop.type = "button";
+  cop.addEventListener("click", async function(){
+    try { await navigator.clipboard.writeText(url); } catch (e) { inp.select(); document.execCommand("copy"); }
+    cop.textContent = "¡Copiado!"; setTimeout(function(){ cop.textContent = "Copiar"; }, 2000);
+  });
+  fila.appendChild(inp); fila.appendChild(cop); zona.appendChild(fila);
+  var acc = el("div", "acciones");
+  var g = el("a", "btn sm", "Agregar a Google Calendar");
+  g.href = "https://calendar.google.com/calendar/render?cid=" + encodeURIComponent(url.replace(/^https:/, "webcal:"));
+  g.target = "_blank"; g.rel = "noopener";
+  var ap = el("a", "btn sec sm", "Apple / Outlook"); ap.href = url.replace(/^https:/, "webcal:"); ap.title = "Abre el calendario del celular o la compu";
+  var cam = el("button", "btn sec sm peligro", "Cambiar enlace"); cam.type = "button";
+  cam.addEventListener("click", function(){
+    if (!confirm("Se crea un enlace nuevo y el actual deja de funcionar (también en los calendarios donde ya lo agregaste). ¿Seguir?")) return;
+    mostrar(it, zona, ver, true).then(function(){ msg("msg", "ok", "Listo: enlace nuevo. Agregalo de nuevo en Google Calendar y borrá el anterior."); });
+  });
+  acc.appendChild(g); acc.appendChild(ap); acc.appendChild(cam); zona.appendChild(acc);
+}
+
+arrancar();
+})();
+</script>
+</body>
+</html>

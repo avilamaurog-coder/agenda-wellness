@@ -6,12 +6,40 @@ import 'package:share_plus/share_plus.dart';
 
 import '../../../core/config/env.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/theme_mode_provider.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../core/widgets/common_widgets.dart';
+import '../../auth/domain/entities/app_user.dart';
 import '../../auth/presentation/auth_providers.dart';
 import '../../services/presentation/pages/services_page.dart';
 import '../data/supabase_showcase_repository.dart';
 import '../domain/showcase.dart';
+
+/// Enlace público del catálogo de ESTE centro (`/catalogo?c=<centro>`), para que cada centro
+/// comparta el suyo (migración 10_catalogo_por_centro.sql).
+String catalogLinkFor(AppUser user) {
+  final base = Env.catalogUrl;
+  if (base.isEmpty || user.centerId.isEmpty) return base;
+  return '$base${base.contains('?') ? '&' : '?'}c=${user.centerId}';
+}
+
+/// Cómo se ven los productos: iconos grandes (cuadrícula) o lista. Se recuerda en el dispositivo.
+enum ProductsView { grid, list }
+
+class ProductsViewNotifier extends Notifier<ProductsView> {
+  static const _key = 'productos_vista';
+
+  @override
+  ProductsView build() =>
+      ref.watch(sharedPreferencesProvider).getString(_key) == 'list' ? ProductsView.list : ProductsView.grid;
+
+  Future<void> set(ProductsView v) async {
+    state = v;
+    await ref.read(sharedPreferencesProvider).setString(_key, v.name);
+  }
+}
+
+final productsViewProvider = NotifierProvider<ProductsViewNotifier, ProductsView>(ProductsViewNotifier.new);
 
 /// Catálogo: servicios, productos y publicaciones promocionales (vitrina).
 class CatalogPage extends ConsumerWidget {
@@ -19,6 +47,7 @@ class CatalogPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final user = ref.watch(sessionUserProvider);
     return DefaultTabController(
       length: 3,
       child: Scaffold(
@@ -34,7 +63,7 @@ class CatalogPage extends ConsumerWidget {
               IconButton(
                 tooltip: 'Compartir catálogo',
                 icon: const Icon(Icons.ios_share_rounded),
-                onPressed: () => Share.share('Conocé nuestros servicios y promociones 🌿 ${Env.catalogUrl}'),
+                onPressed: () => Share.share('Conocé nuestros servicios y promociones 🌿 ${catalogLinkFor(user)}'),
               ),
           ],
           bottom: const TabBar(tabs: [Tab(text: 'Servicios'), Tab(text: 'Productos'), Tab(text: 'Promociones')]),
@@ -53,6 +82,8 @@ class _ProductsTab extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(sessionUserProvider);
     final products = ref.watch(productsProvider);
+    final view = ref.watch(productsViewProvider);
+    void open(Product p) => context.push('/servicios/productos/${p.id}', extra: p);
 
     return Scaffold(
       floatingActionButton: user.isAdmin
@@ -77,19 +108,71 @@ class _ProductsTab extends ConsumerWidget {
                     message: 'Cargá aceites, cremas, gift cards o kits para publicitarlos.',
                   ),
                 ])
-              : GridView.builder(
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
-                  gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                    maxCrossAxisExtent: 240,
-                    mainAxisSpacing: 12,
-                    crossAxisSpacing: 12,
-                    childAspectRatio: 0.72,
-                  ),
-                  itemCount: list.length,
-                  itemBuilder: (_, i) => ProductCard(
-                    product: list[i],
-                    onTap: user.isAdmin ? () => context.push('/servicios/productos/${list[i].id}', extra: list[i]) : null,
-                  ),
+              : Column(
+                  children: [
+                    // Selector de vista: iconos grandes o lista.
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              '${list.length} producto${list.length == 1 ? '' : 's'}',
+                              style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                  ),
+                            ),
+                          ),
+                          SegmentedButton<ProductsView>(
+                            showSelectedIcon: false,
+                            style: const ButtonStyle(visualDensity: VisualDensity.compact),
+                            segments: const [
+                              ButtonSegment(
+                                value: ProductsView.grid,
+                                icon: Icon(Icons.grid_view_rounded),
+                                label: Text('Iconos'),
+                                tooltip: 'Iconos grandes',
+                              ),
+                              ButtonSegment(
+                                value: ProductsView.list,
+                                icon: Icon(Icons.view_list_rounded),
+                                label: Text('Lista'),
+                                tooltip: 'Lista',
+                              ),
+                            ],
+                            selected: {view},
+                            onSelectionChanged: (s) => ref.read(productsViewProvider.notifier).set(s.first),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Expanded(
+                      child: view == ProductsView.list
+                          ? ListView.separated(
+                              padding: const EdgeInsets.fromLTRB(16, 12, 16, 96),
+                              itemCount: list.length,
+                              separatorBuilder: (_, __) => const SizedBox(height: 8),
+                              itemBuilder: (_, i) => ProductTile(
+                                product: list[i],
+                                onTap: user.isAdmin ? () => open(list[i]) : null,
+                              ),
+                            )
+                          : GridView.builder(
+                              padding: const EdgeInsets.fromLTRB(16, 12, 16, 96),
+                              gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                                maxCrossAxisExtent: 240,
+                                mainAxisSpacing: 12,
+                                crossAxisSpacing: 12,
+                                childAspectRatio: 0.72,
+                              ),
+                              itemCount: list.length,
+                              itemBuilder: (_, i) => ProductCard(
+                                product: list[i],
+                                onTap: user.isAdmin ? () => open(list[i]) : null,
+                              ),
+                            ),
+                    ),
+                  ],
                 ),
         ),
       ),
@@ -169,6 +252,89 @@ class ProductCard extends StatelessWidget {
   }
 }
 
+/// Fila compacta de un producto para la vista de lista.
+class ProductTile extends StatelessWidget {
+  const ProductTile({super.key, required this.product, this.onTap});
+  final Product product;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = product;
+    final t = Theme.of(context);
+    final detalle = [
+      if (p.code != null && p.code!.isNotEmpty) p.code!,
+      if (p.category != null && p.category!.isNotEmpty) p.category!,
+      if (p.stock != null) 'Stock: ${p.stock}',
+    ].join(' · ');
+    return Opacity(
+      opacity: p.isActive ? 1 : 0.5,
+      child: Card(
+        margin: EdgeInsets.zero,
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(8),
+            child: Row(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: SizedBox(
+                    width: 64,
+                    height: 64,
+                    child: p.imageUrl != null
+                        ? CachedNetworkImage(imageUrl: p.imageUrl!, fit: BoxFit.cover)
+                        : ColoredBox(
+                            color: AppColors.sageLight.withValues(alpha: 0.35),
+                            child: const Icon(Icons.shopping_bag_outlined, size: 28, color: AppColors.sage),
+                          ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(p.name, maxLines: 2, overflow: TextOverflow.ellipsis,
+                          style: t.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
+                      if (detalle.isNotEmpty)
+                        Text(detalle, maxLines: 1, overflow: TextOverflow.ellipsis,
+                            style: t.textTheme.labelSmall?.copyWith(color: t.colorScheme.onSurfaceVariant)),
+                      if (p.isFeatured || !p.inStock)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Wrap(spacing: 6, children: [
+                            if (p.isFeatured) const _Badge('Destacado', AppColors.terracotta),
+                            if (!p.inStock) const _Badge('Sin stock', AppColors.noShow),
+                          ]),
+                        ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    if (p.promoPrice != null)
+                      Text(Fmt.money(p.price),
+                          style: t.textTheme.labelSmall?.copyWith(decoration: TextDecoration.lineThrough)),
+                    Text(Fmt.money(p.effectivePrice),
+                        style: t.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w800,
+                          color: p.promoPrice != null ? t.colorScheme.secondary : null,
+                        )),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _Badge extends StatelessWidget {
   const _Badge(this.text, this.color);
   final String text;
@@ -231,14 +397,16 @@ class _PostCard extends ConsumerWidget {
   final PromoPost post;
   final bool canEdit;
 
-  String _shareText() {
+  String _shareText(AppUser user) {
     final until = post.endsOn == null ? '' : '\n⏳ Hasta el ${Fmt.date(post.endsOn!)}';
-    final link = Env.catalogUrl.isEmpty ? '' : '\n\n👉 ${Env.catalogUrl}';
+    final url = catalogLinkFor(user);
+    final link = url.isEmpty ? '' : '\n\n👉 $url';
     return '✨ ${post.title}\n\n${post.body ?? ''}$until$link';
   }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final user = ref.watch(sessionUserProvider);
     final p = post;
     final t = Theme.of(context);
     return Card(
@@ -282,7 +450,7 @@ class _PostCard extends ConsumerWidget {
                       ActionChip(
                         avatar: const Icon(Icons.share_rounded, size: 18),
                         label: const Text('Compartir'),
-                        onPressed: () => Share.share(_shareText(), subject: p.title),
+                        onPressed: () => Share.share(_shareText(user), subject: p.title),
                       ),
                       if (canEdit)
                         ActionChip(

@@ -1,0 +1,10 @@
+# Agenda Wellness: todas las rutas de la app (/agenda, /clientes, /catalogo...) cargan index.html
+RewriteEngine On
+# El catálogo público (enlace que se comparte) es una página propia con pedido / presupuesto
+RewriteRule ^catalogo/?$ catalogo.html [L]
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^ index.html [L]
+<FilesMatch "\.(wasm)$">
+  ForceType application/wasm
+</FilesMatch>
