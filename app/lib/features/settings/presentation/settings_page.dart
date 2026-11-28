@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/theme/theme_mode_provider.dart';
 import '../../../core/utils/formatters.dart';
@@ -45,6 +46,15 @@ class SettingsPage extends ConsumerWidget {
                     subtitle: const Text('Ventas, turnos, servicios, clientes · PDF y Excel'),
                     trailing: const Icon(Icons.chevron_right),
                     onTap: () => context.push('/mas/reportes'),
+                  ),
+                // Gastos del centro (página web gastos.html, migración 13): facturas leídas con IA.
+                if (user.isAdmin)
+                  ListTile(
+                    leading: const Icon(Icons.receipt_long_outlined),
+                    title: const Text('Gastos'),
+                    subtitle: const Text('Facturas, vencimientos, pagos y total gastado'),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => launchUrl(Uri.base.resolve('/gastos.html'), webOnlyWindowName: '_self'),
                   ),
                 if (user.isAdmin)
                   ListTile(

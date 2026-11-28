@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#141416">
+<title>Gastos · Agenda Wellness</title>
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<!--
+  GRUPO CAPYBARA · Agenda Wellness · Gastos del centro (28/11/2026)
+  Se publica junto con la app: agenda.grupocapybara.online/gastos.html (acceso desde Más → Gastos).
+  - Solo el administrador del centro. Cada centro ve solo sus facturas (tabla agenda_facturas, migración 13).
+  - Se suben fotos o PDF de facturas; la función agenda-facturas-leer las lee con Claude y completa
+    fecha, servicio, vencimiento y monto. Lo que no se pudo leer queda marcado para revisar a mano.
+  - Cada factura se puede marcar como pagada, con forma y fecha de pago.
+  - Arriba: total gastado (todas las facturas cuentan), pagado y pendiente, con filtro por período.
+  - Se puede bajar la lista como CSV (Excel) o JSON.
+-->
+<style>
+  :root{--bg:#141416;--card:#1C1E22;--line:rgba(255,255,255,.09);--txt:#EAE2D2;--head:#F3EFE7;--muted:#A1A9B1;--gold:#D4A64A;--gold2:#E0B865;--ok:#7BC59A;--err:#E8907E;--warn:#E8C27A}
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--txt);font:15px/1.5 Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  a{color:var(--gold2)}
+  [hidden]{display:none!important}
+  header{display:flex;align-items:center;gap:12px;padding:14px 20px;border-bottom:1px solid var(--line);position:sticky;top:0;background:rgba(20,20,22,.96);z-index:5}
+  header h1{font-size:18px;margin:0;color:var(--head);font-weight:700}
+  header .sp{flex:1}
+  header .centro{color:var(--muted);font-size:13px}
+  .wrap{max-width:1100px;margin:0 auto;padding:20px 16px 60px}
+  .box{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px;margin-bottom:18px}
+  .box h2{font-size:17px;margin:0 0 6px;color:var(--head)}
+  .sub{margin:0;color:var(--muted);font-size:14px}
+  label{display:block;font-size:13px;font-weight:600;color:var(--muted);margin:10px 0 5px}
+  input,select,textarea{width:100%;background:#141416;color:var(--head);border:1px solid rgba(255,255,255,.14);border-radius:10px;padding:9px 12px;font:inherit;font-size:14.5px}
+  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--gold)}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:0;border-radius:11px;padding:10px 16px;font:600 14.5px Inter,system-ui,sans-serif;cursor:pointer;background:var(--gold);color:#141416;text-decoration:none;white-space:nowrap}
+  .btn:hover{background:var(--gold2)}
+  .btn.sec{background:transparent;color:var(--head);border:1px solid rgba(255,255,255,.18)}
+  .btn.sec:hover{border-color:var(--gold)}
+  .btn.sm{padding:6px 10px;font-size:13px;border-radius:9px}
+  .btn.peligro{color:var(--err)}
+  .btn[disabled]{opacity:.5;cursor:not-allowed}
+  .acciones{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:12px}
+  .msg{font-size:14px;margin-top:10px;min-height:1.2em;white-space:pre-line}
+  .msg.ok{color:var(--ok)}.msg.err{color:var(--err)}
+
+  .totales{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
+  .tot{background:#141416;border:1px solid var(--line);border-radius:14px;padding:14px}
+  .tot .et{font-size:12.5px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.05em}
+  .tot .val{font-size:24px;font-weight:700;color:var(--head);margin-top:4px}
+  .tot.princ{border-color:rgba(212,166,74,.5);background:linear-gradient(135deg,#2a241a,#141416)}
+  .tot.princ .val{color:var(--gold2)}
+  .tot .otra{font-size:12.5px;color:var(--muted)}
+  .periodo{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
+  .periodo select{width:auto}
+
+  .soltar{border:2px dashed rgba(212,166,74,.45);border-radius:14px;padding:22px;text-align:center;color:var(--muted);cursor:pointer;margin-top:12px}
+  .soltar.encima{background:rgba(212,166,74,.08);border-color:var(--gold)}
+  .soltar b{color:var(--head)}
+  .cola{margin-top:10px;font-size:14px}
+  .cola div{padding:4px 0;border-bottom:1px solid var(--line)}
+  .cola .ok{color:var(--ok)}.cola .err{color:var(--err)}.cola .warn{color:var(--warn)}
+
+  .filtros{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
+  .filtros input[type=search]{flex:1;min-width:180px}
+  .filtros select{width:auto}
+  .tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:12px}
+  table{width:100%;border-collapse:collapse;font-size:14px}
+  th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:middle}
+  th{color:var(--muted);font-weight:600;font-size:12.5px;background:var(--card)}
+  td.r,th.r{text-align:right}
+  td.monto{font-weight:700;color:var(--head);white-space:nowrap}
+  .pill{display:inline-block;border-radius:999px;padding:2px 9px;font-size:12px;font-weight:700;white-space:nowrap}
+  .pill.pagada{background:rgba(123,197,154,.15);color:var(--ok)}
+  .pill.pendiente{background:rgba(212,166,74,.15);color:var(--gold2)}
+  .pill.vencida{background:rgba(232,144,126,.13);color:var(--err)}
+  .revisar{display:block;font-size:12px;color:var(--warn);margin-top:2px}
+  .vacio{color:var(--muted);text-align:center;padding:22px}
+  td .acc{display:flex;gap:6px;flex-wrap:wrap}
+
+  .fondo{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:10;display:flex;align-items:center;justify-content:center;padding:16px}
+  .panel{background:var(--card);border:1px solid var(--line);border-radius:16px;width:min(560px,100%);max-height:92vh;overflow-y:auto;padding:20px}
+  .panel h2{margin:0 0 4px;font-size:18px;color:var(--head)}
+  .fila2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .chk{display:flex;align-items:center;gap:8px;margin:14px 0 0;color:var(--head);font-weight:600;font-size:14.5px}
+  .chk input{width:auto}
+  .pago{border:1px solid rgba(123,197,154,.35);border-radius:12px;padding:4px 12px 12px;margin-top:10px}
+  body.sin-ia .solo-ia{display:none!important}
+  #login{max-width:420px;margin:60px auto}
+  @media(max-width:600px){.fila2{grid-template-columns:1fr}.totales{grid-template-columns:1fr 1fr;gap:8px}.tot{padding:10px 12px}.tot .val{font-size:19px}}
+</style>
+</head>
+<body>
+<header>
+  <a class="btn sec sm" href="/">← Volver a la agenda</a>
+  <h1>🧾 Gastos</h1>
+  <span class="sp"></span>
+  <span class="centro" id="nombreCentro"></span>
+</header>
+
+<div id="login" class="box" hidden>
+  <h2>Entrá con tu cuenta de la agenda</h2>
+  <form id="formLogin">
+    <label for="lgEmail">Correo</label>
+    <input id="lgEmail" type="email" autocomplete="username" required>
+    <label for="lgPass">Contraseña</label>
+    <input id="lgPass" type="password" autocomplete="current-password" required>
+    <div class="acciones"><button class="btn" type="submit">Entrar</button></div>
+    <div class="msg" id="lgMsg"></div>
+  </form>
+</div>
+
+<div class="wrap" id="sinPermiso" hidden>
+  <div class="box"><h2>Solo para el administrador</h2><p class="sub">Los gastos del centro los ve y los carga el administrador. Si necesitás acceso, pedíselo a quien administra la agenda.</p></div>
+</div>
+
+<div class="wrap" id="app" hidden>
+  <div class="box">
+    <div class="periodo">
+      <h2 style="margin:0;flex:1">Total gastado</h2>
+      <select id="fPeriodo" aria-label="Período">
+        <option value="mes">Este mes</option>
+        <option value="mes_ant">Mes anterior</option>
+        <option value="anio">Este año</option>
+        <option value="todo" selected>Todo</option>
+      </select>
+    </div>
+    <div class="totales">
+      <div class="tot princ"><div class="et">Total gastado</div><div class="val" id="tTotal">—</div><div class="otra" id="tTotalOtras"></div></div>
+      <div class="tot"><div class="et">Pagado</div><div class="val" id="tPagado">—</div></div>
+      <div class="tot"><div class="et">Pendiente</div><div class="val" id="tPendiente">—</div><div class="otra" id="tVencidas"></div></div>
+      <div class="tot"><div class="et">Facturas</div><div class="val" id="tCant">—</div><div class="otra" id="tRevisar"></div></div>
+    </div>
+    <p class="sub" style="margin-top:10px">Se cuentan todas las facturas del período según su fecha de factura (o la de carga si no tiene).</p>
+  </div>
+
+  <!-- Plan Gestión: carga manual simple -->
+  <div class="box" id="cajaManual" hidden>
+    <h2>Cargar factura</h2>
+    <p class="sub">Completá la fecha, el nombre de la factura y el monto total. El vencimiento se pone solo a 15 días (lo podés cambiar).</p>
+    <div class="acciones"><button class="btn" type="button" id="btnCargar">+ Cargar factura</button></div>
+    <p class="sub" style="margin-top:12px;font-size:13px">💡 Con el Plan Integral podés subir la foto o el PDF de la factura y los datos se completan solos.</p>
+  </div>
+
+  <!-- Plan Integral: subir archivos y leerlos con IA -->
+  <div class="box" id="cajaSubir" hidden>
+    <h2>Subir facturas</h2>
+    <p class="sub">Fotos (JPG, PNG) o PDF, de a una o varias juntas. Se leen solas la fecha, el servicio, el vencimiento y el monto; después podés corregir lo que haga falta.</p>
+    <div class="soltar" id="soltar" tabindex="0" role="button" aria-label="Elegir facturas">
+      <b>Arrastrá las facturas acá</b> o tocá para elegirlas (o sacales una foto con el celular)
+      <input id="fArchivos" type="file" accept="image/*,application/pdf" multiple hidden>
+    </div>
+    <div class="cola" id="cola"></div>
+  </div>
+
+  <div class="box">
+    <div class="filtros">
+      <input type="search" id="buscar" placeholder="Buscar por servicio…">
+      <select id="fEstado" aria-label="Estado">
+        <option value="">Todas</option>
+        <option value="pendiente">Pendientes</option>
+        <option value="vencida">Vencidas</option>
+        <option value="pagada">Pagadas</option>
+        <option value="revisar">Para revisar</option>
+      </select>
+      <button class="btn sec sm" type="button" id="btnNueva">+ Cargar a mano</button>
+      <button class="btn sec sm" type="button" id="btnCsv">⬇ CSV</button>
+      <button class="btn sec sm" type="button" id="btnJson">⬇ JSON</button>
+    </div>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Fecha</th><th>Servicio</th><th>Vence</th><th class="r">Monto</th><th>Estado</th><th></th></tr></thead>
+        <tbody id="lista"><tr><td colspan="6" class="vacio">Cargando…</td></tr></tbody>
+      </table>
+    </div>
+    <div class="msg" id="msg"></div>
+  </div>
+</div>
+
+<!-- Editar / marcar pagada -->
+<div class="fondo" id="fondo" hidden>
+  <form class="panel" id="formEd" role="dialog" aria-modal="true" aria-labelledby="edTitulo">
+    <h2 id="edTitulo">Factura</h2>
+    <div class="sub" id="edArchivo"></div>
+    <div class="fila2">
+      <div><label for="eFecha">Fecha de factura *</label><input id="eFecha" type="date"></div>
+      <div><label for="eVence">Vencimiento</label><input id="eVence" type="date"><div class="sub" style="font-size:12px;margin-top:3px">Por defecto, 15 días después de la fecha.</div></div>
+    </div>
+    <label for="eServicio">Nombre de la factura *</label>
+    <input id="eServicio" maxlength="120" placeholder="Ej: Edenor, Internet, Alquiler">
+    <div class="fila2">
+      <div><label for="eMonto">Monto total a pagar *</label><input id="eMonto" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Ej: 18750.50"></div>
+      <div class="solo-ia"><label for="eMoneda">Moneda</label><select id="eMoneda"><option>ARS</option><option>USD</option><option>EUR</option></select></div>
+    </div>
+    <label class="chk"><input type="checkbox" id="ePagada"> ✅ El pago ya se realizó</label>
+    <div class="pago" id="ePago" hidden>
+      <div class="fila2">
+        <div><label for="eForma">Forma de pago *</label>
+          <select id="eForma">
+            <option value="">— Elegir —</option>
+            <option value="efectivo">Efectivo</option>
+            <option value="transferencia">Transferencia bancaria</option>
+            <option value="tarjeta_debito">Tarjeta de débito</option>
+            <option value="tarjeta_credito">Tarjeta de crédito</option>
+            <option value="mercadopago">Mercado Pago</option>
+            <option value="otro">Otro</option>
+          </select></div>
+        <div><label for="ePagadaEl">Fecha de pago</label><input id="ePagadaEl" type="date"></div>
+      </div>
+    </div>
+    <div class="solo-ia">
+      <label for="eNotas">Notas</label>
+      <textarea id="eNotas" maxlength="400" rows="2"></textarea>
+    </div>
+    <div class="acciones">
+      <button class="btn" type="submit">Guardar</button>
+      <button class="btn sec" type="button" id="edCancelar">Cancelar</button>
+      <span style="flex:1"></span>
+      <button class="btn sec sm peligro" type="button" id="edBorrar">Borrar</button>
+    </div>
+    <div class="msg" id="edMsg"></div>
+  </form>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+(function(){
+"use strict";
+var SB_URL = "https://qmjrndimibjoxrigvmgt.supabase.co";
+var SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFtanJuZGltaWJqb3hyaWd2bWd0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTUyODY1MTQsImV4cCI6MjExMDg2MjUxNH0.HNS36EbHA7FO84XTXsr6JN9CElkwoep8CbBd8wDm84c";
+var CLAVE_SESION = "sb-qmjrndimibjoxrigvmgt-auth-token";
+var BUCKET = "agenda-facturas";
+var FORMAS = { efectivo:"Efectivo", transferencia:"Transferencia bancaria", tarjeta_debito:"Tarjeta de débito", tarjeta_credito:"Tarjeta de crédito", mercadopago:"Mercado Pago", otro:"Otro" };
+var DATOS = { fecha_factura:"fecha", servicio:"servicio", vencimiento:"vencimiento", monto:"monto" };
+
+function $(id){ return document.getElementById(id); }
+function el(tag, cls, txt){ var e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; }
+function msg(id, tipo, t){ $(id).className = "msg " + (tipo||""); $(id).textContent = t || ""; }
+function hoyISO(){ var d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0,10); }
+function fecha(iso){ if (!iso) return "—"; var p = iso.slice(0,10).split("-"); return p[2] + "/" + p[1] + "/" + p[0]; }
+function plata(n, mon){
+  if (n == null) return "—";
+  var x = Number(n), dec = Math.round(x * 100) % 100 ? 2 : 0;   // $ 18.750,50 · $ 18.750
+  return (mon && mon !== "ARS" ? mon + " " : "$ ") + x.toLocaleString("es-AR", { minimumFractionDigits: dec, maximumFractionDigits: 2 });
+}
+function uuid(){ return crypto.randomUUID ? crypto.randomUUID() : "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function(c){ var r = Math.random()*16|0; return (c === "x" ? r : (r&3|8)).toString(16); }); }
+
+/* La app Flutter guarda la sesión sin "expires_at": se calcula desde el token (igual que las otras páginas). */
+(function prepararSesion(){
+  try {
+    var crudo = localStorage.getItem(CLAVE_SESION); if (!crudo) return;
+    var s = JSON.parse(crudo); if (typeof s === "string") s = JSON.parse(s);
+    if (s && s.currentSession) s = s.currentSession;
+    if (!s || !s.access_token) return;
+    if (!s.expires_at) { var pl = JSON.parse(atob(s.access_token.split(".")[1].replace(/-/g,"+").replace(/_/g,"/"))); s.expires_at = pl.exp; }
+    localStorage.setItem(CLAVE_SESION, JSON.stringify(s));
+  } catch (e) {}
+})();
+var sb = supabase.createClient(SB_URL, SB_KEY, { auth: { storageKey: CLAVE_SESION, persistSession: true, autoRefreshToken: true, detectSessionInUrl: false } });
+
+var estado = { centro: null, facturas: [], editando: null };
+
+/* ---------- ingreso ---------- */
+async function arrancar(){
+  var r = await sb.auth.getSession(), ses = r.data && r.data.session;
+  if (!ses) { $("login").hidden = false; return; }
+  try { await cargar(); }
+  catch (e) { console.error(e); $("login").hidden = false; $("app").hidden = true; msg("lgMsg", "err", e.message || "No pudimos abrir tu centro. Entrá de nuevo."); }
+}
+$("formLogin").addEventListener("submit", async function(ev){
+  ev.preventDefault(); msg("lgMsg", "", "Entrando…");
+  var r = await sb.auth.signInWithPassword({ email: $("lgEmail").value.trim(), password: $("lgPass").value });
+  if (r.error) return msg("lgMsg", "err", "Correo o contraseña incorrectos.");
+  $("lgPass").value = "";
+  try { await cargar(); $("login").hidden = true; }
+  catch (e) { console.error(e); msg("lgMsg", "err", e.message || "No pudimos abrir tu centro."); }
+});
+async function cargar(){
+  var rc = await sb.rpc("current_center_id"), rr = await sb.rpc("agenda_rol");
+  if (rc.error || !rc.data) throw new Error("Tu cuenta todavía no tiene un centro activo en la agenda.");
+  var c = await sb.from("centers").select("id,name").eq("id", rc.data).maybeSingle();
+  estado.centro = c.data || { id: rc.data, name: "" };
+  $("nombreCentro").textContent = estado.centro.name || "";
+  if (rr.data !== "admin") { $("sinPermiso").hidden = false; return; }
+  $("app").hidden = false;
+  // La lectura con IA es del Plan Integral: lo decide el servidor (función agenda-facturas-leer).
+  // Mientras responde se cargan las facturas; si la consulta falla, queda la carga manual.
+  var consulta = sb.functions.invoke("agenda-facturas-leer", { body: { consultar: true } }).then(function(q){
+    estado.conIA = !!(q.data && q.data.lectura_ia);
+  }).catch(function(){ estado.conIA = false; }).then(function(){
+    document.body.classList.toggle("sin-ia", !estado.conIA);
+    $("cajaSubir").hidden = !estado.conIA;
+    $("cajaManual").hidden = estado.conIA;
+  });
+  await Promise.all([cargarFacturas(), consulta]);
+}
+async function cargarFacturas(){
+  var r = await sb.from("agenda_facturas").select("*").order("fecha_factura", { ascending: false, nullsFirst: true }).order("created_at", { ascending: false }).limit(2000);
+  if (r.error) { console.error(r.error); $("lista").innerHTML = '<tr><td colspan="6" class="vacio">No pudimos cargar las facturas.</td></tr>'; return; }
+  estado.facturas = r.data || [];
+  pintar();
+}
+
+/* ---------- estado y totales ---------- */
+function estadoDe(f){ if (f.pagada) return "pagada"; return f.vencimiento && f.vencimiento < hoyISO() ? "vencida" : "pendiente"; }
+function fechaRef(f){ return f.fecha_factura || (f.created_at || "").slice(0,10); }
+function enPeriodo(f){
+  var p = $("fPeriodo").value, d = fechaRef(f), h = hoyISO();
+  if (p === "todo") return true;
+  if (p === "anio") return d.slice(0,4) === h.slice(0,4);
+  if (p === "mes") return d.slice(0,7) === h.slice(0,7);
+  var x = new Date(h.slice(0,7) + "-15T12:00:00"); x.setMonth(x.getMonth() - 1);
+  return d.slice(0,7) === x.toISOString().slice(0,7);
+}
+function pintarTotales(){
+  var lista = estado.facturas.filter(enPeriodo), suma = {}, pag = 0, pen = 0, venc = 0, rev = 0;
+  lista.forEach(function(f){
+    var m = f.moneda || "ARS", v = Number(f.monto) || 0;
+    suma[m] = (suma[m] || 0) + v;
+    if (m === "ARS") { if (f.pagada) pag += v; else pen += v; }
+    if (estadoDe(f) === "vencida") venc++;
+    if ((f.faltantes || []).length) rev++;
+  });
+  $("tTotal").textContent = plata(suma.ARS || 0);
+  $("tTotalOtras").textContent = Object.keys(suma).filter(function(m){ return m !== "ARS"; }).map(function(m){ return "+ " + plata(suma[m], m); }).join(" · ");
+  $("tPagado").textContent = plata(pag);
+  $("tPendiente").textContent = plata(pen);
+  $("tVencidas").textContent = venc ? venc + (venc === 1 ? " vencida sin pagar" : " vencidas sin pagar") : "";
+  $("tCant").textContent = String(lista.length);
+  $("tRevisar").textContent = rev ? rev + " para revisar" : "";
+}
+
+/* ---------- lista ---------- */
+function pintar(){
+  pintarTotales();
+  var tb = $("lista"), q = $("buscar").value.trim().toLowerCase(), est = $("fEstado").value; tb.innerHTML = "";
+  var lista = estado.facturas.filter(function(f){
+    if (!enPeriodo(f)) return false;
+    if (q && (f.servicio || "").toLowerCase().indexOf(q) < 0) return false;
+    if (est === "revisar") return (f.faltantes || []).length > 0;
+    return !est || estadoDe(f) === est;
+  });
+  if (!lista.length) { tb.innerHTML = '<tr><td colspan="6" class="vacio">' + (estado.facturas.length ? "No hay facturas con ese filtro." : "Todavía no cargaste facturas. Subí la primera arriba.") + "</td></tr>"; return; }
+  lista.forEach(function(f){
+    var tr = el("tr"), st = estadoDe(f);
+    tr.appendChild(el("td", null, fecha(f.fecha_factura)));
+    var ts = el("td"); ts.appendChild(document.createTextNode(f.servicio || "Sin servicio"));
+    if ((f.faltantes || []).length) ts.appendChild(el("span", "revisar", "⚠ Revisar: " + f.faltantes.map(function(k){ return DATOS[k] || k; }).join(", ")));
+    tr.appendChild(ts);
+    tr.appendChild(el("td", null, fecha(f.vencimiento)));
+    tr.appendChild(el("td", "r monto", plata(f.monto, f.moneda)));
+    var te = el("td"), pill = el("span", "pill " + st, st === "pagada" ? "Pagada" : st === "vencida" ? "Vencida" : "Pendiente"); te.appendChild(pill);
+    if (f.pagada && f.forma_pago) te.appendChild(el("span", "revisar", FORMAS[f.forma_pago] + (f.pagada_el ? " · " + fecha(f.pagada_el) : ""))).style.color = "var(--muted)";
+    tr.appendChild(te);
+    var ta = el("td"), acc = el("div", "acc");
+    if (!f.pagada) { var bp = el("button", "btn sm", "Marcar pagada"); bp.type = "button"; bp.addEventListener("click", function(){ abrir(f, true); }); acc.appendChild(bp); }
+    var be = el("button", "btn sec sm", "Editar"); be.type = "button"; be.addEventListener("click", function(){ abrir(f, false); }); acc.appendChild(be);
+    if (f.archivo) { var bv = el("button", "btn sec sm", "Ver"); bv.type = "button"; bv.title = "Ver el archivo"; bv.addEventListener("click", function(){ verArchivo(f); }); acc.appendChild(bv); }
+    ta.appendChild(acc); tr.appendChild(ta);
+    tb.appendChild(tr);
+  });
+}
+["buscar"].forEach(function(id){ $(id).addEventListener("input", pintar); });
+["fEstado","fPeriodo"].forEach(function(id){ $(id).addEventListener("change", pintar); });
+
+async function verArchivo(f){
+  var w = window.open("", "_blank");
+  var r = await sb.storage.from(BUCKET).createSignedUrl(f.archivo, 300);
+  if (r.error || !r.data) { if (w) w.close(); return msg("msg", "err", "No pudimos abrir el archivo."); }
+  if (w) w.location = r.data.signedUrl; else location.href = r.data.signedUrl;
+}
+
+/* ---------- subir y leer ---------- */
+/* Las fotos se pasan a JPG de hasta 2000 px: pesan menos y se leen mejor. Los PDF van tal cual. */
+function aJpg(file){
+  return new Promise(function(ok, mal){
+    var url = URL.createObjectURL(file), im = new Image();
+    im.onload = function(){
+      var e = Math.min(1, 2000 / Math.max(im.width, im.height)), cv = document.createElement("canvas");
+      cv.width = Math.round(im.width * e); cv.height = Math.round(im.height * e);
+      var cx = cv.getContext("2d"); cx.fillStyle = "#fff"; cx.fillRect(0, 0, cv.width, cv.height); cx.drawImage(im, 0, 0, cv.width, cv.height);
+      URL.revokeObjectURL(url);
+      cv.toBlob(function(b){ b ? ok(b) : mal(new Error("imagen")); }, "image/jpeg", 0.88);
+    };
+    im.onerror = function(){ URL.revokeObjectURL(url); mal(new Error("formato")); };
+    im.src = url;
+  });
+}
+function renglon(nombre){ var d = el("div", null, "⏳ " + nombre + ": subiendo…"); $("cola").prepend(d); return d; }
+async function subirUna(file){
+  var r = renglon(file.name), esPdf = file.type === "application/pdf" || /\.pdf$/i.test(file.name), blob, ext, tipo;
+  try {
+    if (esPdf) {
+      if (file.size > 10 * 1024 * 1024) throw new Error("El PDF pesa más de 10 MB.");
+      blob = file; ext = "pdf"; tipo = "application/pdf";
+    } else {
+      try { blob = await aJpg(file); } catch (e) { throw new Error("No pudimos abrir esa imagen. Si es una foto HEIC del iPhone, mandala como JPG o como PDF."); }
+      ext = "jpg"; tipo = "image/jpeg";
+    }
+    var id = uuid(), ruta = estado.centro.id + "/" + id + "." + ext;
+    var up = await sb.storage.from(BUCKET).upload(ruta, blob, { contentType: tipo, upsert: false });
+    if (up.error) throw new Error("No pudimos subir el archivo.");
+    var ins = await sb.from("agenda_facturas").insert({ id: id, archivo: ruta, archivo_nombre: file.name.slice(0, 200), faltantes: ["fecha_factura","servicio","vencimiento","monto"] }).select().single();
+    if (ins.error) { await sb.storage.from(BUCKET).remove([ruta]); throw new Error("No pudimos guardar la factura."); }
+    estado.facturas.unshift(ins.data); pintar();
+    r.textContent = "🔎 " + file.name + ": leyendo la factura…";
+    var lr = await sb.functions.invoke("agenda-facturas-leer", { body: { id: id } });
+    var cuerpo = lr.data || {};
+    if (lr.error && lr.error.context && lr.error.context.json) { try { cuerpo = await lr.error.context.json(); } catch (e) {} }
+    if (!cuerpo.factura) {
+      r.className = "warn"; r.textContent = "⚠ " + file.name + ": quedó guardada sin leer. " + (cuerpo.error || "Completá los datos con Editar.");
+      return;
+    }
+    var i = estado.facturas.findIndex(function(x){ return x.id === id; }); if (i >= 0) estado.facturas[i] = cuerpo.factura; pintar();
+    var f = cuerpo.factura, falt = f.faltantes || [];
+    if (cuerpo.es_factura === false) { r.className = "warn"; r.textContent = "⚠ " + file.name + ": no parece una factura. Revisala o borrala."; }
+    else if (falt.length) { r.className = "warn"; r.textContent = "⚠ " + file.name + ": leída. Revisá a mano: " + falt.map(function(k){ return DATOS[k] || k; }).join(", ") + "."; }
+    else { r.className = "ok"; r.textContent = "✓ " + file.name + ": " + f.servicio + " · " + plata(f.monto, f.moneda) + " · vence " + fecha(f.vencimiento); }
+  } catch (e) {
+    console.error(e); r.className = "err"; r.textContent = "✗ " + file.name + ": " + (e.message || "no se pudo cargar.");
+  }
+}
+async function subirVarias(files){
+  for (var i = 0; i < files.length; i++) await subirUna(files[i]);
+}
+var zona = $("soltar");
+zona.addEventListener("click", function(){ $("fArchivos").click(); });
+zona.addEventListener("keydown", function(ev){ if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); $("fArchivos").click(); } });
+zona.addEventListener("dragover", function(ev){ ev.preventDefault(); zona.classList.add("encima"); });
+zona.addEventListener("dragleave", function(){ zona.classList.remove("encima"); });
+zona.addEventListener("drop", function(ev){ ev.preventDefault(); zona.classList.remove("encima"); subirVarias(Array.prototype.slice.call(ev.dataTransfer.files)); });
+$("fArchivos").addEventListener("change", function(){ var fs = Array.prototype.slice.call(this.files); this.value = ""; subirVarias(fs); });
+
+/* ---------- editar / marcar pagada ---------- */
+/* Vencimiento por defecto: 15 días después de la fecha de factura, mientras no se cambie a mano. */
+function sumarDias(iso, n){ var d = new Date(iso + "T12:00:00"); d.setDate(d.getDate() + n); return d.toISOString().slice(0,10); }
+var venceAuto = false;
+$("eFecha").addEventListener("change", function(){ if (venceAuto && this.value) $("eVence").value = sumarDias(this.value, 15); });
+$("eVence").addEventListener("input", function(){ venceAuto = !this.value; });
+
+function abrir(f, marcarPagada){
+  estado.editando = f || null;
+  $("edTitulo").textContent = f ? (marcarPagada ? "Marcar como pagada" : "Editar factura") : "Cargar factura";
+  $("edArchivo").textContent = f && f.archivo_nombre ? "Archivo: " + f.archivo_nombre : "";
+  $("eFecha").value = f ? (f.fecha_factura || "") : hoyISO();
+  venceAuto = !(f && f.vencimiento);
+  $("eVence").value = f && f.vencimiento || ($("eFecha").value ? sumarDias($("eFecha").value, 15) : "");
+  $("eServicio").value = f && f.servicio || "";
+  $("eMonto").value = f && f.monto != null ? f.monto : "";
+  $("eMoneda").value = f && f.moneda || "ARS";
+  $("ePagada").checked = !!(f && f.pagada) || !!marcarPagada;
+  $("eForma").value = f && f.forma_pago || "";
+  $("ePagadaEl").value = f && f.pagada_el || (marcarPagada ? hoyISO() : "");
+  $("eNotas").value = f && f.notas || "";
+  $("edBorrar").hidden = !f;
+  $("ePago").hidden = !$("ePagada").checked;
+  msg("edMsg");
+  $("fondo").hidden = false;
+  (marcarPagada ? $("eForma") : $("eServicio")).focus();
+}
+$("ePagada").addEventListener("change", function(){
+  $("ePago").hidden = !this.checked;
+  if (this.checked && !$("ePagadaEl").value) $("ePagadaEl").value = hoyISO();
+});
+function cerrar(){ $("fondo").hidden = true; estado.editando = null; }
+$("edCancelar").addEventListener("click", cerrar);
+$("fondo").addEventListener("click", function(ev){ if (ev.target === this) cerrar(); });
+document.addEventListener("keydown", function(ev){ if (ev.key === "Escape" && !$("fondo").hidden) cerrar(); });
+$("btnNueva").addEventListener("click", function(){ abrir(null, false); });
+$("btnCargar").addEventListener("click", function(){ abrir(null, false); });
+
+$("formEd").addEventListener("submit", async function(ev){
+  ev.preventDefault();
+  var pagada = $("ePagada").checked, monto = $("eMonto").value === "" ? null : Number($("eMonto").value);
+  if (!$("eFecha").value) { msg("edMsg", "err", "Completá la fecha de la factura."); $("eFecha").focus(); return; }
+  if (!$("eServicio").value.trim()) { msg("edMsg", "err", "Completá el nombre de la factura."); $("eServicio").focus(); return; }
+  if (monto == null || isNaN(monto) || monto <= 0) { msg("edMsg", "err", "Completá el monto total a pagar."); $("eMonto").focus(); return; }
+  if (pagada && !$("eForma").value) { msg("edMsg", "err", "Elegí con qué forma de pago se pagó."); $("eForma").focus(); return; }
+  if (!$("eVence").value) $("eVence").value = sumarDias($("eFecha").value, 15);
+  var d = {
+    fecha_factura: $("eFecha").value || null, vencimiento: $("eVence").value || null,
+    servicio: $("eServicio").value.trim() || null, monto: monto, moneda: $("eMoneda").value,
+    pagada: pagada, forma_pago: pagada ? $("eForma").value : null, pagada_el: pagada ? ($("ePagadaEl").value || hoyISO()) : null,
+    notas: $("eNotas").value.trim() || null
+  };
+  // Lo que se completó a mano deja de figurar como "para revisar".
+  d.faltantes = ["fecha_factura","servicio","vencimiento","monto"].filter(function(k){ return d[k] == null; });
+  msg("edMsg", "", "Guardando…");
+  var r = estado.editando
+    ? await sb.from("agenda_facturas").update(d).eq("id", estado.editando.id).select().single()
+    : await sb.from("agenda_facturas").insert(d).select().single();
+  if (r.error) { console.error(r.error); return msg("edMsg", "err", "No pudimos guardar. Probá de nuevo."); }
+  var i = estado.facturas.findIndex(function(x){ return x.id === r.data.id; });
+  if (i >= 0) estado.facturas[i] = r.data; else estado.facturas.unshift(r.data);
+  cerrar(); pintar();
+  msg("msg", "ok", pagada ? "Listo: factura pagada con " + FORMAS[d.forma_pago].toLowerCase() + "." : "Factura guardada.");
+});
+$("edBorrar").addEventListener("click", async function(){
+  var f = estado.editando; if (!f) return;
+  if (!confirm("¿Borrar la factura" + (f.servicio ? " de " + f.servicio : "") + "? También se borra el archivo. No se puede deshacer.")) return;
+  var r = await sb.from("agenda_facturas").delete().eq("id", f.id);
+  if (r.error) return msg("edMsg", "err", "No pudimos borrarla.");
+  if (f.archivo) await sb.storage.from(BUCKET).remove([f.archivo]);
+  estado.facturas = estado.facturas.filter(function(x){ return x.id !== f.id; });
+  cerrar(); pintar(); msg("msg", "ok", "Factura borrada.");
+});
+
+/* ---------- exportar ---------- */
+function filasExport(){
+  return estado.facturas.filter(enPeriodo).map(function(f){
+    return { fecha_factura: f.fecha_factura, servicio: f.servicio, vencimiento: f.vencimiento, monto: f.monto == null ? null : Number(f.monto), moneda: f.moneda,
+             estado: estadoDe(f), pagada: f.pagada, forma_pago: f.forma_pago, pagada_el: f.pagada_el, para_revisar: f.faltantes || [], notas: f.notas, archivo: f.archivo_nombre };
+  });
+}
+function bajar(nombre, tipo, contenido){
+  var a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([contenido], { type: tipo })); a.download = nombre;
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(function(){ URL.revokeObjectURL(a.href); }, 4000);
+}
+$("btnJson").addEventListener("click", function(){ bajar("gastos.json", "application/json", JSON.stringify(filasExport(), null, 2)); });
+$("btnCsv").addEventListener("click", function(){
+  var cols = ["fecha_factura","servicio","vencimiento","monto","moneda","estado","forma_pago","pagada_el","para_revisar","notas","archivo"];
+  var esc = function(v){ if (v == null) return ""; if (Array.isArray(v)) v = v.join(" "); v = String(v); return /[";\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
+  var lineas = [cols.join(";")].concat(filasExport().map(function(f){ return cols.map(function(c){ return c === "monto" && f[c] != null ? String(f[c]).replace(".", ",") : esc(f[c]); }).join(";"); }));
+  bajar("gastos.csv", "text/csv;charset=utf-8", "﻿" + lineas.join("\r\n"));
+});
+
+arrancar();
+})();
+</script>
+</body>
+</html>
